@@ -36,11 +36,19 @@ const reportRoutes = require('./routes/reportRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 
+app.get('/', (req, res) => {
+    res.json({ message: 'Order Lunch backend is running' });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+
+app.use((req, res) => {
+    res.status(404).json({ message: 'Not Found' });
+});
 
 // Global Error Handler
 const errorHandler = require('./middleware/errorHandler');
@@ -110,7 +118,9 @@ const startServer = async () => {
     }
 };
 
-startServer();
+if (require.main === module) {
+    startServer();
+}
 
 // Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));
