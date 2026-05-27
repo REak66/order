@@ -30,16 +30,16 @@ const Login = () => {
       {/* Decorative Animated Mesh Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute top-[10%] left-[5%] w-72 h-72 md:w-[450px] md:h-[450px] rounded-full bg-primary-400/20 dark:bg-primary-900/10 blur-[80px] md:blur-[120px] motion-preset-fade motion-duration-3000"
+          className="absolute top-[10%] left-[5%] w-72 h-72 md:w-[450px] md:h-[450px] rounded-full bg-primary-400/20 dark:bg-primary-900/10 blur-[80px] md:blur-[120px] motion-preset-fade motion-duration-350"
         />
         <div
-          className="absolute bottom-[10%] right-[5%] w-72 h-72 md:w-[450px] md:h-[450px] rounded-full bg-pink-400/15 dark:bg-violet-900/10 blur-[80px] md:blur-[120px] motion-preset-fade motion-duration-3000"
+          className="absolute bottom-[10%] right-[5%] w-72 h-72 md:w-[450px] md:h-[450px] rounded-full bg-pink-400/15 dark:bg-violet-900/10 blur-[80px] md:blur-[120px] motion-preset-fade motion-duration-350"
         />
       </div>
 
       {/* Main glass card container */}
       <div
-        className="relative z-10 max-w-md w-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-slate-800/80 overflow-hidden motion-preset-fade motion-duration-3000"
+        className="relative z-10 max-w-md w-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-slate-800/80 overflow-hidden motion-preset-fade motion-duration-350"
       >
         <div className="p-8 md:p-10">
           <div className="flex justify-center mb-6">

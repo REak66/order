@@ -103,7 +103,7 @@ const Dashboard = () => {
       </div>
 
       <div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 motion-preset-fade motion-duration-3000"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 motion-preset-fade motion-duration-350"
       >
         {statCards.map((card, index) => (
           <div
@@ -124,7 +124,7 @@ const Dashboard = () => {
       </div>
 
       <div
-        className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 motion-preset-fade motion-duration-3000 motion-delay-150"
+        className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 motion-preset-fade motion-duration-350 motion-delay-150"
       >
         <div className="flex items-center gap-2 mb-8">
           <TrendingUp className="text-primary-500" />

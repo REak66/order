@@ -72,7 +72,7 @@ const Settings = () => {
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-8 motion-preset-fade motion-duration-3000"
+        className="space-y-8 motion-preset-fade motion-duration-350"
       >
         {/* Telegram Config */}
         <div

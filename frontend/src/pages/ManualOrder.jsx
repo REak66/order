@@ -172,7 +172,7 @@ const ManualOrder = () => {
                 ) : filteredStaff.length === 0 ? (
                   <tr
                     key="empty"
-                    className="motion-preset-fade motion-duration-3000"
+                    className="motion-preset-fade motion-duration-350"
                   >
                     <td colSpan="5" className="px-6 py-12 text-center text-slate-500">No staff found</td>
                   </tr>
@@ -185,7 +185,7 @@ const ManualOrder = () => {
                     return (
                       <tr
                         key={memberId}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-3000"
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-350"
                       >
                         <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{member.full_name}</td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">@{member.username || 'N/A'}</td>

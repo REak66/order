@@ -61,7 +61,7 @@ const DashboardLayout = () => {
               <>
                 {isActive && (
                   <span
-                    className="absolute inset-0 bg-primary-50 dark:bg-primary-900/10 border-l-4 border-primary-500 z-0 motion-preset-fade motion-duration-3000"
+                    className="absolute inset-0 bg-primary-50 dark:bg-primary-900/10 border-l-4 border-primary-500 z-0 motion-preset-fade motion-duration-350"
                   />
                 )}
                 <span className="relative z-10 flex items-center gap-3">
@@ -92,11 +92,11 @@ const DashboardLayout = () => {
       {isSidebarOpen && (
         <>
           <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden motion-preset-fade motion-duration-3000"
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden motion-preset-fade motion-duration-350"
             onClick={() => setIsSidebarOpen(false)}
           />
           <aside
-            className="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 lg:hidden motion-preset-fade motion-duration-3000"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 lg:hidden motion-preset-fade motion-duration-350"
           >
             {renderSidebarContent()}
           </aside>
