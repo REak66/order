@@ -9,9 +9,12 @@ const {
     getDateRange,
     getMonthlyReportMeta,
     getMonthlyExportRows,
-    getMonthlyDayStatus
+    getMonthlyDayStatus,
+    toDisplayDate,
+    parseOrderDate
 } = require('../utils/dateUtils');
-const { STATUSES } = require('../utils/constants');
+const { STATUSES, SYMBOLS } = require('../utils/constants');
+const botService = require('../services/botService');
 
 const getReportData = async ({ date, startDate, endDate, period, branch, month }) => {
     const range = getDateRange({ date, startDate, endDate, period, month });
@@ -133,11 +136,36 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
         return res.json({ message: 'Manual order cleared', user });
     }
 
+    // Check if order already exists
+    const existingOrder = await Order.findOne({ user: userId, order_date: orderDate });
+    const isNewOrder = !existingOrder;
+    const previousStatus = existingOrder?.status;
+
     const order = await Order.findOneAndUpdate(
         { user: userId, order_date: orderDate },
         { status },
         { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
+
+    // Send Telegram notification if order is placed or status changed to 'ordered'
+    if (status === 'ordered' && (isNewOrder || previousStatus !== 'ordered')) {
+        try {
+            await botService.sendOrderNotification(user, order);
+        } catch (error) {
+            console.error('Failed to send order notification:', error.message);
+            // Don't fail the request if notification fails
+        }
+    }
+
+    // Send Telegram notification if order is cancelled
+    if (status === 'cancelled' && previousStatus !== 'cancelled') {
+        try {
+            await botService.sendCancellationNotification(user, order);
+        } catch (error) {
+            console.error('Failed to send cancellation notification:', error.message);
+            // Don't fail the request if notification fails
+        }
+    }
 
     res.json({ message: 'Manual order saved', order, user });
 });

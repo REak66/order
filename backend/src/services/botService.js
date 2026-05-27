@@ -524,6 +524,54 @@ const restart = async () => {
     return launch();
 };
 
+// ─── Notification Helpers ────────────────────────────────────────────────────
+
+const sendOrderNotification = async (user, order) => {
+    const runningBot = ensureBot();
+    if (!runningBot) return false;
+
+    const groupId = await getGroupId();
+    if (!groupId) return false;
+
+    try {
+        const displayDate = toDisplayDate(new Date(order.order_date));
+        const message = `✅ *Order Confirmed*\n\n` +
+            `👤 *Name:* ${user.full_name || 'Unknown'}\n` +
+            `🏢 *Branch:* ${user.branch}\n` +
+            `📅 *Date:* ${displayDate}\n` +
+            `${SYMBOLS.ordered}`;
+
+        await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
+        return true;
+    } catch (error) {
+        console.error('Order notification error:', error.message);
+        return false;
+    }
+};
+
+const sendCancellationNotification = async (user, order) => {
+    const runningBot = ensureBot();
+    if (!runningBot) return false;
+
+    const groupId = await getGroupId();
+    if (!groupId) return false;
+
+    try {
+        const displayDate = toDisplayDate(new Date(order.order_date));
+        const message = `❌ *Order Cancelled*\n\n` +
+            `👤 *Name:* ${user.full_name || 'Unknown'}\n` +
+            `🏢 *Branch:* ${user.branch}\n` +
+            `📅 *Date:* ${displayDate}\n` +
+            `${SYMBOLS.blocked}`;
+
+        await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
+        return true;
+    } catch (error) {
+        console.error('Cancellation notification error:', error.message);
+        return false;
+    }
+};
+
 // ─── Scheduled Tasks ──────────────────────────────────────────────────────────
 
 // Auto order reminder at admin-configured order start time Cambodia time.
@@ -547,5 +595,7 @@ module.exports = {
     stop,
     syncGroupMuteState,
     sendDailyReport,
-    buildDailyReport
+    buildDailyReport,
+    sendOrderNotification,
+    sendCancellationNotification
 };
