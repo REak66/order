@@ -1,4 +1,4 @@
-import { clsx } from 'clsx';
+import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 
 const twMerge = extendTailwindMerge({
@@ -13,7 +13,7 @@ const twMerge = extendTailwindMerge({
  * Merge Tailwind CSS class names, resolving conflicts with tailwind-merge
  * and accepting conditional classes via clsx.
  */
-export const cn = (...inputs) => twMerge(clsx(inputs));
+export const cn = (...inputs: ClassValue[]): string => twMerge(clsx(inputs));
 
 /**
  * Alias for backwards compatibility with the original `cx` export.
@@ -23,6 +23,7 @@ export const cx = cn;
 /**
  * Helps sort class objects for Tailwind IntelliSense ordering.
  */
-export function sortCx(classes) {
+export function sortCx<T extends Record<string, string | number | Record<string, string | number | Record<string, string | number>>>>(classes: T): T {
     return classes;
 }
+
