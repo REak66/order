@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "projects": [
+    {
+      "src": "backend",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    },
+    {
+      "src": "frontend",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/src/app.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/dist/$1"
+    }
+  ]
+}

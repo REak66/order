@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/app.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "runtime": "nodejs18.x"
+      }
+    }
+  ],
+  "env": {
+    "MONGO_URI": "@mongo_uri",
+    "JWT_SECRET": "@jwt_secret",
+    "BOT_TOKEN": "@bot_token",
+    "TELEGRAM_GROUP_ID": "@telegram_group_id",
+    "ADMIN_USERNAME": "@admin_username",
+    "ADMIN_PASSWORD": "@admin_password",
+    "FRONTEND_URL": "@frontend_url"
+  },
+  "functions": {
+    "src/app.js": {
+      "maxDuration": 60
+    }
+  }
+}
