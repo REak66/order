@@ -1,5 +1,6 @@
 const Setting = require('../models/Setting');
 const bot = require('../services/botService');
+const asyncHandler = require('../utils/asyncHandler');
 
 const DEFAULT_SETTINGS = {
     bot_token: '',
@@ -31,62 +32,52 @@ const normalizeGroupId = (value) => {
     return /^-?\d+$/.test(groupId) ? groupId : null;
 };
 
-exports.getSettings = async (req, res) => {
-    try {
-        const rows = await Setting.find();
-        const settings = { ...DEFAULT_SETTINGS };
-        rows.forEach(row => {
-            settings[row.key] = row.value || DEFAULT_SETTINGS[row.key] || '';
-        });
-        res.json(settings);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
+exports.getSettings = asyncHandler(async (req, res) => {
+    const rows = await Setting.find();
+    const settings = { ...DEFAULT_SETTINGS };
+    rows.forEach(row => {
+        settings[row.key] = row.value || DEFAULT_SETTINGS[row.key] || '';
+    });
+    res.json(settings);
+});
 
-exports.updateSettings = async (req, res) => {
+exports.updateSettings = asyncHandler(async (req, res) => {
     const settings = { ...req.body };
     const shouldRestartBot = Object.prototype.hasOwnProperty.call(settings, 'bot_token');
 
-    try {
-        for (const key of TIME_SETTING_KEYS) {
-            if (!Object.prototype.hasOwnProperty.call(settings, key)) continue;
+    for (const key of TIME_SETTING_KEYS) {
+        if (!Object.prototype.hasOwnProperty.call(settings, key)) continue;
 
-            const normalizedTime = normalizeTimeValue(settings[key]);
-            if (!normalizedTime) {
-                return res.status(400).json({ message: `${key} must be a valid HH:mm time` });
-            }
-
-            settings[key] = normalizedTime;
+        const normalizedTime = normalizeTimeValue(settings[key]);
+        if (!normalizedTime) {
+            return res.status(400).json({ message: `${key} must be a valid HH:mm time` });
         }
 
-        if (Object.prototype.hasOwnProperty.call(settings, 'group_id')) {
-            const normalizedGroupId = normalizeGroupId(settings.group_id);
-            if (normalizedGroupId === null) {
-                return res.status(400).json({ message: 'Group ID must be numeric' });
-            }
-
-            settings.group_id = normalizedGroupId;
-        }
-
-        for (const [key, value] of Object.entries(settings)) {
-            await Setting.findOneAndUpdate(
-                { key },
-                { value, updated_at: Date.now() },
-                { upsert: true }
-            );
-        }
-
-        if (shouldRestartBot) {
-            bot.restart().catch(error => {
-                console.error('Bot restart error:', error.message);
-            });
-        }
-
-        res.json({ message: 'Settings updated' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        settings[key] = normalizedTime;
     }
-};
+
+    if (Object.prototype.hasOwnProperty.call(settings, 'group_id')) {
+        const normalizedGroupId = normalizeGroupId(settings.group_id);
+        if (normalizedGroupId === null) {
+            return res.status(400).json({ message: 'Group ID must be numeric' });
+        }
+
+        settings.group_id = normalizedGroupId;
+    }
+
+    for (const [key, value] of Object.entries(settings)) {
+        await Setting.findOneAndUpdate(
+            { key },
+            { value, updated_at: Date.now() },
+            { upsert: true }
+        );
+    }
+
+    if (shouldRestartBot) {
+        bot.restart().catch(error => {
+            console.error('Bot restart error:', error.message);
+        });
+    }
+
+    res.json({ message: 'Settings updated' });
+});

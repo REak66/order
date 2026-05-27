@@ -3,9 +3,26 @@ const cron = require('node-cron');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Setting = require('../models/Setting');
+const {
+    BRANCHES,
+    SYMBOLS,
+    BRANCH_ALIASES
+} = require('../utils/constants');
+const {
+    TIME_ZONE,
+    toLocalIsoDate,
+    getTomorrowDate,
+    getTomorrowIsoDate,
+    toDisplayDate,
+    getTomorrowDisplayDate,
+    parseOrderDate,
+    toOrderInputDate,
+    getExpectedOrderIsoDate,
+    isTomorrowOrderDate,
+    isTodayOrFutureOrderDate
+} = require('../utils/dateUtils');
 require('dotenv').config();
 
-const TIME_ZONE = process.env.TIME_ZONE || 'Asia/Phnom_Penh';
 const DEFAULT_SETTINGS = {
     bot_token: '',
     group_id: '',
@@ -21,27 +38,7 @@ let lastGroupMuteState = null;
 let lastDailyReportDate = null;
 let lastOrderReminderDate = null;
 
-const BRANCHES = [
-    { name: 'BYD 6A', reportLabel: '6A' },
-    { name: 'City Mall', reportLabel: 'CityMall' },
-    { name: 'BYD 60M', reportLabel: '60M' }
-];
-
-const SYMBOLS = {
-    ordered: '✅',
-    cancelled: '❌',
-    confirm: '✍️',
-    blocked: '🚫'
-};
-
-const BRANCH_ALIASES = {
-    'city mall': 'City Mall',
-    citymall: 'City Mall',
-    byd6a: 'BYD 6A',
-    'byd 6a': 'BYD 6A',
-    byd60m: 'BYD 60M',
-    'byd 60m': 'BYD 60M'
-};
+// ─── Validation Helpers ───────────────────────────────────────────────────────
 
 const isPlaceholderToken = (token) => {
     return !token || token === 'your_telegram_bot_token_here';
@@ -50,6 +47,16 @@ const isPlaceholderToken = (token) => {
 const isValidGroupId = (groupId) => {
     return typeof groupId === 'string' && /^-?\d+$/.test(groupId.trim());
 };
+
+const isValidBranch = (branch) => {
+    return BRANCHES.some(item => item.name === branch);
+};
+
+const normalizeBranch = (brand) => {
+    return BRANCH_ALIASES[brand.trim().toLowerCase()] || brand.trim();
+};
+
+// ─── Settings Helpers ─────────────────────────────────────────────────────────
 
 const getSettingValue = async (key) => {
     const setting = await Setting.findOne({ key });
@@ -72,13 +79,7 @@ const getGroupId = async () => {
     return isValidGroupId(envGroupId) ? envGroupId.trim() : '';
 };
 
-const normalizeBranch = (brand) => {
-    return BRANCH_ALIASES[brand.trim().toLowerCase()] || brand.trim();
-};
-
-const isValidBranch = (branch) => {
-    return BRANCHES.some(item => item.name === branch);
-};
+// ─── Time / Schedule Helpers ──────────────────────────────────────────────────
 
 const parseTimeToMinutes = (time) => {
     if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) return null;
@@ -121,7 +122,6 @@ const isTimeInRange = (currentMinutes, startMinutes, endMinutes) => {
     return currentMinutes >= startMinutes || currentMinutes < endMinutes;
 };
 
-// Staff can order tomorrow's lunch only during the admin-configured Cambodia-time window.
 const isOrderingAllowed = async (date = new Date()) => {
     const startMinutes = parseTimeToMinutes(await getSettingValue('order_start_time'));
     const endMinutes = parseTimeToMinutes(await getSettingValue('order_end_time'));
@@ -130,6 +130,8 @@ const isOrderingAllowed = async (date = new Date()) => {
 
     return isTimeInRange(getLocalMinutes(date), startMinutes, endMinutes);
 };
+
+// ─── Message Helpers ──────────────────────────────────────────────────────────
 
 const getTelegramMention = (ctx) => {
     if (ctx.from?.username) return `@${ctx.from.username}`;
@@ -171,69 +173,12 @@ const replyToMessage = async (ctx, message) => {
     }
 };
 
-const toDisplayDate = (date = new Date()) => {
-    return date.toLocaleDateString('en-GB', { timeZone: TIME_ZONE });
-};
-
-const toLocalIsoDate = (date = new Date()) => {
-    return new Intl.DateTimeFormat('en-CA', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        timeZone: TIME_ZONE
-    }).format(date);
-};
-
-const getTomorrowDate = (date = new Date()) => {
-    return new Date(date.getTime() + (24 * 60 * 60 * 1000));
-};
-
-const getTomorrowIsoDate = (date = new Date()) => {
-    return toLocalIsoDate(getTomorrowDate(date));
-};
-
-const getTomorrowDisplayDate = () => {
-    return toDisplayDate(getTomorrowDate());
-};
-
-const parseOrderDate = (dateStr) => {
-    const [day, month, year] = dateStr.split('-');
-    if (!day || !month || !year) return null;
-
-    const date = new Date(`${year}-${month}-${day}T00:00:00`);
-    if (
-        Number.isNaN(date.getTime()) ||
-        date.getFullYear() !== Number(year) ||
-        date.getMonth() + 1 !== Number(month) ||
-        date.getDate() !== Number(day)
-    ) {
-        return null;
-    }
-
-    return `${year}-${month}-${day}`;
-};
-
-const toOrderInputDate = (isoDate) => {
-    const [year, month, day] = isoDate.split('-');
-    return `${day}-${month}-${year}`;
-};
-
-const getExpectedOrderIsoDate = () => {
-    return getTomorrowIsoDate(new Date());
-};
-
-const isTomorrowOrderDate = (orderIsoDate) => {
-    return orderIsoDate === getExpectedOrderIsoDate();
-};
-
-const isTodayOrFutureOrderDate = (orderIsoDate) => {
-    return orderIsoDate >= toLocalIsoDate(new Date());
-};
-
 const formatStaffName = (user) => {
     const username = user.username && user.username !== 'N/A' ? ` @${user.username.replace(/^@/, '')}` : '';
     return `${user.full_name || 'មិនស្គាល់ឈ្មោះ'}${username}`;
 };
+
+// ─── Report Builder ───────────────────────────────────────────────────────────
 
 const buildDailyReport = async (date = new Date()) => {
     const lunchDate = getTomorrowDate(date);
@@ -267,6 +212,8 @@ const buildDailyReport = async (date = new Date()) => {
 
     return report.trim();
 };
+
+// ─── Bot Lifecycle ────────────────────────────────────────────────────────────
 
 const ensureBot = () => {
     if (!botLaunched || !bot) {
@@ -364,6 +311,8 @@ const sendOrderReminderIfDue = async () => {
         console.error('Order reminder error:', error.message);
     }
 };
+
+// ─── Bot Handlers ─────────────────────────────────────────────────────────────
 
 const registerHandlers = (telegramBot) => {
     telegramBot.catch((error, ctx) => {
@@ -527,6 +476,8 @@ const registerHandlers = (telegramBot) => {
     });
 };
 
+// ─── Launch / Stop / Restart ──────────────────────────────────────────────────
+
 const launch = async () => {
     const configuredToken = await getConfiguredBotToken();
     if (!configuredToken) {
@@ -572,6 +523,8 @@ const restart = async () => {
     await stop('settings changed');
     return launch();
 };
+
+// ─── Scheduled Tasks ──────────────────────────────────────────────────────────
 
 // Auto order reminder at admin-configured order start time Cambodia time.
 cron.schedule('* * * * *', () => {

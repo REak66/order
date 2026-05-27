@@ -1,11 +1,19 @@
+import flyonui from 'flyonui';
+import tailwindcssMotion from 'tailwindcss-motion';
+import tailwindcssIntersect from 'tailwindcss-intersect';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    "./node_modules/flyonui/dist/js/*.js",
   ],
   theme: {
     extend: {
+      transitionDuration: {
+        '3000': '3000ms',
+      },
       colors: {
         primary: {
           50: '#f0f9ff',
@@ -22,5 +30,10 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    flyonui,
+    tailwindcssMotion,
+    tailwindcssIntersect,
+  ],
 }
+
