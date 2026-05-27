@@ -41,11 +41,11 @@ app.get('/', (req, res) => {
     res.json({ message: 'Order Lunch backend is running' });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/staff', staffRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+app.use('/auth', authRoutes);
+app.use('/staff', staffRoutes);
+app.use('/reports', reportRoutes);
+app.use('/settings', settingsRoutes);
+app.use('/dashboard', dashboardRoutes);
 
 app.use((req, res) => {
     res.status(404).json({ message: 'Not Found' });
