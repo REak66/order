@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import {
   Plus,
   Search,
@@ -36,7 +36,7 @@ const StaffManagement = () => {
 
   const fetchStaff = async () => {
     try {
-      const res = await axios.get('/api/staff');
+      const res = await api.get('/api/staff');
       setStaff(res.data);
     } catch (error) {
       toast.error('Failed to fetch staff');
@@ -49,10 +49,10 @@ const StaffManagement = () => {
     e.preventDefault();
     try {
       if (editingStaff) {
-        await axios.put(`/api/staff/${editingStaff._id || editingStaff.id}`, formData);
+        await api.put(`/api/staff/${editingStaff._id || editingStaff.id}`, formData);
         toast.success('Staff updated successfully');
       } else {
-        await axios.post('/api/staff', formData);
+        await api.post('/api/staff', formData);
         toast.success('Staff added successfully');
       }
       setIsModalOpen(false);
@@ -66,7 +66,7 @@ const StaffManagement = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this staff?')) {
       try {
-        await axios.delete(`/api/staff/${id}`);
+        await api.delete(`/api/staff/${id}`);
         toast.success('Staff deleted');
         fetchStaff();
       } catch (error) {

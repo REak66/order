@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { 
   Save, 
   MessageSquare, 
@@ -30,7 +30,7 @@ const Settings = () => {
 
   const fetchSettings = async () => {
     try {
-      const res = await axios.get('/api/settings');
+      const res = await api.get('/api/settings');
       setSettings((current) => ({
         ...current,
         ...res.data,
@@ -49,7 +49,7 @@ const Settings = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      await axios.post('/api/settings', settings);
+      await api.post('/api/settings', settings);
       toast.success('Settings updated successfully');
     } catch (error) {
       toast.error('Failed to update settings');

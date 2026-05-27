@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { Calendar, CheckCircle, Search, Utensils, XCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { addDays, format } from 'date-fns';
@@ -34,7 +34,7 @@ const ManualOrder = () => {
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/staff');
+      const res = await api.get('/api/staff');
       setStaff(res.data);
       setSelectedBranches(Object.fromEntries(
         res.data.map(member => [member._id || member.id, member.branch || 'City Mall'])
@@ -76,7 +76,7 @@ const ManualOrder = () => {
 
     setSavingId(memberId);
     try {
-      await axios.post('/api/reports/manual-order', {
+      await api.post('/api/reports/manual-order', {
         userId: memberId,
         orderDate,
         status,

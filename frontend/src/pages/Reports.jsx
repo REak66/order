@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import {
   Download,
   CalendarRange,
@@ -82,7 +82,7 @@ const Reports = () => {
   const fetchReports = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/reports', { params: filters });
+      const res = await api.get('/api/reports', { params: filters });
       setReports(res.data);
     } catch (error) {
       toast.error('Failed to fetch reports');
@@ -93,7 +93,7 @@ const Reports = () => {
 
   const handleExport = async (type) => {
     try {
-      const res = await axios.get(`/api/reports/export/${type}`, {
+      const res = await api.get(`/api/reports/export/${type}`, {
         params: {
           ...filters,
           template: isMonthlyReport ? 'monthly' : filters.period
@@ -127,7 +127,7 @@ const Reports = () => {
 
   const handleManualStatus = async (report, status) => {
     try {
-      await axios.post('/api/reports/manual-order', {
+      await api.post('/api/reports/manual-order', {
         userId: report.user_id,
         orderDate: report.order_date,
         status

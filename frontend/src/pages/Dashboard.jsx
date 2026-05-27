@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import {
   Users,
   CheckCircle,
@@ -67,8 +67,8 @@ const Dashboard = () => {
   const fetchData = async () => {
     try {
       const [statsRes, chartRes] = await Promise.all([
-        axios.get('/api/dashboard/stats'),
-        axios.get('/api/dashboard/charts')
+        api.get('/api/dashboard/stats'),
+        api.get('/api/dashboard/charts')
       ]);
       setStats(statsRes.data);
       setChartData(chartRes.data);
