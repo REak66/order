@@ -19,7 +19,7 @@
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "jspdf": "^2.6.0",
+    "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.2",
     "mongoose": "^9.6.2",
     "morgan": "^1.10.0",
