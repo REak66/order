@@ -145,7 +145,7 @@ const getOrderDateAlert = (ctx) => {
 };
 
 const getOrderClosedAlert = (ctx) => {
-    return `${getTelegramMention(ctx)} ពេលវេលាបញ្ជាទិញបានបិទហើយ។ សូមទាក់ទង Admin ដើម្បីបញ្ចូលការបញ្ជាទិញដោយដៃក្នុងប្រព័ន្ធ។`;
+    return `${getTelegramMention(ctx)} ពេលវេលាបញ្ជាទិញបានបិទហើយ។ សូមទាក់ទង Admin @SreyNeang2701 និង @Thaivouchkim ដើម្បីការកម្មង់ដោយដៃក្នុងប្រព័ន្ធ។`;
 };
 
 const getAlreadyDoneAlert = (ctx) => {
