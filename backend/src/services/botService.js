@@ -412,8 +412,8 @@ const registerHandlers = (telegramBot) => {
         }
     });
 
-    telegramBot.on('text', async (ctx) => {
-        if (ctx.chat.type === 'private' && ctx.message.text.startsWith('/')) return;
+    telegramBot.on('text', async (ctx, next) => {
+        if (ctx.message.text && ctx.message.text.startsWith('/')) return next();
 
         const text = ctx.message.text;
         const telegramId = ctx.from.id;
