@@ -428,8 +428,14 @@ const registerHandlers = (telegramBot) => {
                 return replyToMessage(ctx, getOrderDateAlert(ctx));
             }
 
-            if (!isOrder && !isTodayOrFutureOrderDate(isoDate)) {
-                return replyToMessage(ctx, getPastCancelAlert());
+            if (!isOrder) {
+                const today = toLocalIsoDate();
+                if (isoDate < today) {
+                    return replyToMessage(ctx, `${getTelegramMention(ctx)} កាលបរិច្ឆេទកម្មង់ បានផុតកំណត់សម្រាប់លុប។ សូមអរគុណ។`);
+                }
+                if (isoDate > today) {
+                    return replyToMessage(ctx, `${getTelegramMention(ctx)} កាលបរិច្ឆេទមិនទាន់បានកម្មង់។ សូមអរគុណ。`);
+                }
             }
 
             await User.findByIdAndUpdate(user._id, {
