@@ -431,10 +431,10 @@ const registerHandlers = (telegramBot) => {
             if (!isOrder) {
                 const today = toLocalIsoDate();
                 if (isoDate < today) {
-                    return replyToMessage(ctx, `${getTelegramMention(ctx)} កាលបរិច្ឆេទកម្មង់ បានផុតកំណត់សម្រាប់លុប។ សូមអរគុណ។`);
+                    return replyToMessage(ctx, `${getTelegramMention(ctx)} កាលបរិច្ឆេទកម្មង់ បានផុតកំណត់សម្រាប់លុប។ សូមអរគុណ។ ${SYMBOLS.blocked}`);
                 }
                 if (isoDate > today) {
-                    return replyToMessage(ctx, `${getTelegramMention(ctx)} កាលបរិច្ឆេទមិនទាន់បានកម្មង់។ សូមអរគុណ。`);
+                    return replyToMessage(ctx, `${getTelegramMention(ctx)} កាលបរិច្ឆេទមិនទាន់បានកម្មង់។ សូមអរគុណ។ ${SYMBOLS.blocked}`);
                 }
             }
 
@@ -465,7 +465,7 @@ const registerHandlers = (telegramBot) => {
                     { status: 'ordered' },
                     { upsert: true }
                 );
-                return replyToMessage(ctx, `បញ្ជាក់ការបញ្ជាទិញ ${SYMBOLS.confirm}`);
+                return replyToMessage(ctx, `បញ្ជាក់ការកម្មង់ ថ្ងៃទី : ${dateStr} ${SYMBOLS.confirm}`);
             }
 
             await Order.findOneAndUpdate(
@@ -473,10 +473,10 @@ const registerHandlers = (telegramBot) => {
                 { status: 'cancelled' },
                 { upsert: true }
             );
-            return replyToMessage(ctx, `បានលុបការបញ្ជាទិញ ${SYMBOLS.blocked}`);
+            return replyToMessage(ctx, `បានលុបការកម្មង់ ថ្ងៃទី : ${dateStr} ${SYMBOLS.blocked}`);
         } catch (error) {
             console.error('Order/Cancel processing error:', error.message);
-            return replyToMessage(ctx, 'មានបញ្ហាក្នុងការដំណើរការសំណើរបស់អ្នក។');
+            return replyToMessage(ctx, 'មានបញ្ហាក្នុងការដំណើរការការកម្មង់របស់អ្នក។');
         }
     });
 
