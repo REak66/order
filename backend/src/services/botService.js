@@ -649,8 +649,7 @@ const sendOrderNotification = async (user, order) => {
         const message = `✅ *Order Confirmed*\n\n` +
             `👤 *ឈ្មោះ:* ${user.full_name || 'Unknown'}\n` +
             `🏢 *សាខា:* ${user.branch}\n` +
-            `📅 *ថ្ងៃទី:* ${displayDate}\n` +
-            `${SYMBOLS.ordered}`;
+            `📅 *ថ្ងៃទី:* ${displayDate}`;
 
         await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
         return true;
@@ -672,8 +671,7 @@ const sendCancellationNotification = async (user, order) => {
         const message = `❌ *Order Cancelled*\n\n` +
             `👤 *ឈ្មោះ:* ${user.full_name || 'Unknown'}\n` +
             `🏢 *សាខា:* ${user.branch}\n` +
-            `📅 *ថ្ងៃទី:* ${displayDate}\n` +
-            `${SYMBOLS.blocked}`;
+            `📅 *ថ្ងៃទី:* ${displayDate}`;
 
         await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
         return true;
