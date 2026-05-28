@@ -4,6 +4,7 @@ import { Calendar, CheckCircle, Search, Utensils, XCircle, RotateCcw } from 'luc
 import { toast } from 'react-hot-toast';
 import { addDays, format } from 'date-fns';
 import SearchSelect from '../components/SearchSelect';
+import SelectDate from '../components/SelectDate';
 import { cn } from '../utils/cx';
 
 const todayIso = format(new Date(), 'yyyy-MM-dd');
@@ -129,11 +130,10 @@ const ManualOrder = () => {
             <Calendar size={12} />
             Order Date
           </label>
-          <input
-            type="date"
-            className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition"
+          <SelectDate
             value={orderDate}
             onChange={(e) => setOrderDate(e.target.value)}
+            className="w-[180px]"
           />
         </div>
 

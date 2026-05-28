@@ -17,13 +17,13 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     let formattedDate = label;
     try {
-      const date = new Date(label);
+      const date = parseISO(label);
       if (!isNaN(date.getTime())) {
         formattedDate = format(date, 'EEEE, MMM dd, yyyy');
       }
@@ -151,7 +151,7 @@ const Dashboard = () => {
                 dy={10}
                 tickFormatter={(value) => {
                   try {
-                    const date = new Date(value);
+                    const date = parseISO(value);
                     if (!isNaN(date.getTime())) {
                       return format(date, 'MMM dd');
                     }

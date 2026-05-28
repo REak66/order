@@ -8,8 +8,9 @@ import {
   Search
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { addDays, endOfWeek, format, startOfWeek } from 'date-fns';
+import { addDays, endOfWeek, format, startOfWeek, parseISO } from 'date-fns';
 import SearchSelect from '../components/SearchSelect';
+import SelectDate from '../components/SelectDate';
 import { cn } from '../utils/cx';
 
 const branchOptions = [
@@ -200,31 +201,37 @@ const Reports = () => {
             <Calendar size={12} />
             {isMonthlyReport ? 'Month' : filters.period === 'daily' ? 'Order Date' : 'Base Date'}
           </label>
-          <input
-            type={isMonthlyReport ? 'month' : 'date'}
-            className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition"
-            value={isMonthlyReport ? filters.month : filters.date}
-            onChange={(e) => isMonthlyReport ? updateMonth(e.target.value) : updateDate(e.target.value)}
-          />
+          {isMonthlyReport ? (
+            <input
+              type="month"
+              className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition text-sm font-medium text-slate-700 dark:text-slate-200"
+              value={filters.month}
+              onChange={(e) => updateMonth(e.target.value)}
+            />
+          ) : (
+            <SelectDate
+              value={filters.date}
+              onChange={(e) => updateDate(e.target.value)}
+              className="w-[180px]"
+            />
+          )}
         </div>
         {filters.period === 'custom' && (
           <>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 uppercase">Start Date</label>
-              <input
-                type="date"
-                className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition"
+              <SelectDate
                 value={filters.startDate}
                 onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                className="w-[180px]"
               />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 uppercase">End Date</label>
-              <input
-                type="date"
-                className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition"
+              <SelectDate
                 value={filters.endDate}
                 onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                className="w-[180px]"
               />
             </div>
           </>
@@ -356,7 +363,7 @@ const Reports = () => {
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
                       >
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                          {report.order_date ? format(new Date(report.order_date), 'MMM dd, yyyy') : '-'}
+                          {report.order_date ? format(parseISO(report.order_date), 'MMM dd, yyyy') : '-'}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{report.branch}</td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{report.total_staff}</td>
@@ -372,7 +379,7 @@ const Reports = () => {
                         <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{report.full_name}</td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{report.branch}</td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                          {report.order_date ? format(new Date(report.order_date), 'MMM dd, yyyy') : '-'}
+                          {report.order_date ? format(parseISO(report.order_date), 'MMM dd, yyyy') : '-'}
                         </td>
                         <td className="px-6 py-4">
                           <span className={cn(

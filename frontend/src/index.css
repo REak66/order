@@ -33,3 +33,161 @@ body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50;
   }
 }
+
+/* Beautiful custom styles for Cally Calendar component */
+calendar-date {
+  --color-accent: #0284c7; /* Sky blue primary-600 */
+  --color-text-on-accent: #ffffff;
+  font-family: inherit;
+  width: 100%;
+}
+
+/* Light Mode Defaults */
+calendar-date::part(heading),
+calendar-month::part(heading) {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #0f172a; /* slate-900 */
+}
+
+calendar-month::part(th) {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b; /* slate-500 */
+  text-transform: uppercase;
+}
+
+calendar-month::part(day) {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155; /* slate-700 */
+  transition: all 0.15s ease-in-out;
+}
+
+calendar-month::part(day):hover {
+  background-color: #f1f5f9; /* slate-100 */
+  color: #0f172a; /* slate-900 */
+}
+
+calendar-month::part(today) {
+  border: 2px solid #0284c7;
+  font-weight: 700;
+  color: #0284c7;
+}
+
+calendar-month::part(selected) {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
+}
+
+calendar-month::part(outside) {
+  color: #cbd5e1; /* slate-300 */
+  opacity: 0.35;
+}
+
+calendar-date::part(button) {
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0; /* slate-200 */
+  background: transparent;
+  color: #64748b; /* slate-500 */
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+calendar-date::part(button):hover {
+  background: #f1f5f9; /* slate-100 */
+  color: #0f172a; /* slate-900 */
+  border-color: #cbd5e1;
+}
+
+/* Helper mixin style for Class-Based Dark Mode */
+.dark calendar-date,
+.dark calendar-month {
+  color-scheme: dark;
+}
+.dark calendar-date::part(heading),
+.dark calendar-month::part(heading) {
+  color: #f8fafc; /* slate-50 */
+}
+.dark calendar-month::part(th) {
+  color: #94a3b8; /* slate-400 */
+}
+.dark calendar-month::part(day) {
+  color: #cbd5e1; /* slate-300 */
+}
+.dark calendar-month::part(day):hover {
+  background-color: #1e293b; /* slate-800 */
+  color: #ffffff;
+}
+.dark calendar-month::part(today) {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+.dark calendar-month::part(selected) {
+  background-color: #38bdf8 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+}
+.dark calendar-month::part(outside) {
+  color: #475569; /* slate-600 */
+  opacity: 0.5;
+}
+.dark calendar-date::part(button) {
+  border-color: #334155; /* slate-700 */
+  color: #cbd5e1; /* slate-300 */
+}
+.dark calendar-date::part(button):hover {
+  background: #1e293b; /* slate-800 */
+  color: #ffffff;
+  border-color: #475569;
+}
+
+/* System-based Media Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  calendar-date,
+  calendar-month {
+    color-scheme: dark;
+  }
+  calendar-date::part(heading),
+  calendar-month::part(heading) {
+    color: #f8fafc; /* slate-50 */
+  }
+  calendar-month::part(th) {
+    color: #94a3b8; /* slate-400 */
+  }
+  calendar-month::part(day) {
+    color: #cbd5e1; /* slate-300 */
+  }
+  calendar-month::part(day):hover {
+    background-color: #1e293b; /* slate-800 */
+    color: #ffffff;
+  }
+  calendar-month::part(today) {
+    border-color: #38bdf8;
+    color: #38bdf8;
+  }
+  calendar-month::part(selected) {
+    background-color: #38bdf8 !important;
+    color: #0f172a !important;
+    box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+  }
+  calendar-month::part(outside) {
+    color: #475569; /* slate-600 */
+    opacity: 0.5;
+  }
+  calendar-date::part(button) {
+    border-color: #334155; /* slate-700 */
+    color: #cbd5e1; /* slate-300 */
+  }
+  calendar-date::part(button):hover {
+    background: #1e293b; /* slate-800 */
+    color: #ffffff;
+    border-color: #475569;
+  }
+}
+
+
+
+
