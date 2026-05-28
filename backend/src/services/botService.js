@@ -186,7 +186,7 @@ const buildDailyReport = async (date = new Date()) => {
     const displayDate = toDisplayDate(lunchDate);
     const users = await User.find({}).sort({ branch: 1, full_name: 1 });
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
-    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មងបាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
+    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
 
     BRANCHES.forEach(branch => {
         const orderedUsers = users.filter(user => (
@@ -316,7 +316,7 @@ const sendOrderReminderIfDue = async () => {
 
         await runningBot.telegram.sendMessage(
             GROUP_ID,
-            `សូមអ្នកទាំងអស់គ្នាបញ្ជាទិញអាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${getTomorrowDisplayDate()})។\n\nទម្រង់បញ្ជាទិញ:\n- Name : Full Name\n- Brand : BYD6A\n- Order on ${toOrderInputDate(getTomorrowIsoDate())} ${SYMBOLS.ordered}`
+            `សូមអ្នកទាំងអស់គ្នាបញ្ជាទិញអាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${getTomorrowDisplayDate()})។\n\nទម្រង់បញ្ជាទិញ:\n- ឈ្មោះ : Full Name\n- សាខា : BYD6A\n- កម្មង់នៅថ្ងៃទី : ${toOrderInputDate(getTomorrowIsoDate())} ${SYMBOLS.ordered}`
         );
         lastOrderReminderDate = today;
     } catch (error) {
@@ -352,14 +352,14 @@ const registerHandlers = (telegramBot) => {
             return ctx.reply(`ប្រព័ន្ធបញ្ជាទិញអាហារថ្ងៃត្រង់រួចរាល់!
 
 សម្រាប់បញ្ជាទិញ:
-- Name : Full Name
-- Brand : BYD6A
-- Order on ${tomorrowOrderDate} ${SYMBOLS.ordered}
+- ឈ្មោះ : Full Name
+- សាខា : BYD6A
+- កម្មង់ថ្ងៃទី : ${tomorrowOrderDate} ${SYMBOLS.ordered}
 
 សម្រាប់លុបការបញ្ជាទិញ:
-- Name : Full Name
-- Brand : BYD6A
-- Cancel on ${tomorrowOrderDate} ${SYMBOLS.cancelled}
+- ឈ្មោះ : Full Name
+- សាខា : BYD6A
+- លុបថ្ងៃទី : ${tomorrowOrderDate} ${SYMBOLS.cancelled}
 
 លំនាំដើម: មិនបញ្ជាទិញ`);
         } catch (error) {
@@ -548,9 +548,9 @@ const sendOrderNotification = async (user, order) => {
     try {
         const displayDate = toDisplayDate(new Date(order.order_date));
         const message = `✅ *Order Confirmed*\n\n` +
-            `👤 *Name:* ${user.full_name || 'Unknown'}\n` +
-            `🏢 *Branch:* ${user.branch}\n` +
-            `📅 *Date:* ${displayDate}\n` +
+            `👤 *ឈ្មោះ:* ${user.full_name || 'Unknown'}\n` +
+            `🏢 *សាខា:* ${user.branch}\n` +
+            `📅 *ថ្ងៃទី:* ${displayDate}\n` +
             `${SYMBOLS.ordered}`;
 
         await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
@@ -571,9 +571,9 @@ const sendCancellationNotification = async (user, order) => {
     try {
         const displayDate = toDisplayDate(new Date(order.order_date));
         const message = `❌ *Order Cancelled*\n\n` +
-            `👤 *Name:* ${user.full_name || 'Unknown'}\n` +
-            `🏢 *Branch:* ${user.branch}\n` +
-            `📅 *Date:* ${displayDate}\n` +
+            `👤 *ឈ្មោះ:* ${user.full_name || 'Unknown'}\n` +
+            `🏢 *សាខា:* ${user.branch}\n` +
+            `📅 *ថ្ងៃទី:* ${displayDate}\n` +
             `${SYMBOLS.blocked}`;
 
         await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
