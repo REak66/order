@@ -132,7 +132,18 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
     }
 
     if (status === 'not_ordered') {
+        const existingOrder = await Order.findOne({ user: userId, order_date: orderDate });
+        const previousStatus = existingOrder?.status;
+
         await Order.findOneAndDelete({ user: userId, order_date: orderDate });
+
+        if (previousStatus === 'ordered') {
+            try {
+                await botService.sendCancellationNotification(user, { order_date: orderDate });
+            } catch (error) {
+                console.error('Failed to send cancellation notification:', error.message);
+            }
+        }
         return res.json({ message: 'Manual order cleared', user });
     }
 
