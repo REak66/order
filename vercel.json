@@ -28,5 +28,11 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/tick",
+      "schedule": "0 * * * *"
+    }
   ]
 }

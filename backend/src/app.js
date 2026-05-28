@@ -36,6 +36,7 @@ const staffRoutes = require('./routes/staffRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const cronRoutes = require('./routes/cronRoutes');
 
 // Root status endpoint
 app.get('/', (req, res) => {
@@ -47,6 +48,14 @@ app.get('/api', (req, res) => {
     res.json({ message: 'Order Lunch API is running' });
 });
 
+// Telegram Webhook POST endpoints (direct serverless injection)
+app.post('/api/telegram-webhook', (req, res, next) => {
+    bot.handleWebhook(req, res, next);
+});
+app.post('/telegram-webhook', (req, res, next) => {
+    bot.handleWebhook(req, res, next);
+});
+
 // Configure API Router to handle both prefixed (/api) and non-prefixed routes for robustness
 const apiRouter = express.Router();
 apiRouter.use('/auth', authRoutes);
@@ -54,6 +63,8 @@ apiRouter.use('/staff', staffRoutes);
 apiRouter.use('/reports', reportRoutes);
 apiRouter.use('/settings', settingsRoutes);
 apiRouter.use('/dashboard', dashboardRoutes);
+apiRouter.use('/cron', cronRoutes);
+apiRouter.use('/', cronRoutes);
 
 app.use('/api', apiRouter);
 app.use('/', apiRouter);

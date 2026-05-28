@@ -35,8 +35,29 @@ let bot = null;
 let botToken = '';
 let botLaunched = false;
 let lastGroupMuteState = null;
-let lastDailyReportDate = null;
-let lastOrderReminderDate = null;
+
+// Persistent state helpers for Serverless stateless environments
+const getPersistentState = async (key) => {
+    try {
+        const setting = await Setting.findOne({ key });
+        return setting?.value || null;
+    } catch (error) {
+        console.error(`Error reading persistent state for key ${key}:`, error.message);
+        return null;
+    }
+};
+
+const setPersistentState = async (key, value) => {
+    try {
+        await Setting.findOneAndUpdate(
+            { key },
+            { value, updated_at: new Date() },
+            { upsert: true, new: true }
+        );
+    } catch (error) {
+        console.error(`Error writing persistent state for key ${key}:`, error.message);
+    }
+};
 
 // ─── Validation Helpers ───────────────────────────────────────────────────────
 
@@ -339,12 +360,13 @@ const sendDailyReportIfDue = async () => {
     if (!(await isCurrentReportTime())) return;
 
     const today = toLocalIsoDate();
-    if (lastDailyReportDate === today) return;
+    const lastSent = await getPersistentState('last_report_date');
+    if (lastSent === today) return;
 
     console.log('Running daily lunch report...');
     const sent = await sendDailyReport();
     if (sent) {
-        lastDailyReportDate = today;
+        await setPersistentState('last_report_date', today);
     }
 };
 
@@ -355,7 +377,8 @@ const sendOrderReminderIfDue = async () => {
     if (!runningBot) return;
 
     const today = toLocalIsoDate();
-    if (lastOrderReminderDate === today) return;
+    const lastSent = await getPersistentState('last_reminder_date');
+    if (lastSent === today) return;
 
     try {
         const GROUP_ID = await getGroupId();
@@ -365,7 +388,7 @@ const sendOrderReminderIfDue = async () => {
             GROUP_ID,
             `សូមអ្នកទាំងអស់គ្នាកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${getTomorrowDisplayDate()})។\n\nទម្រង់កម្មង់:\n- ឈ្មោះ : Full Name\n- សាខា : BYD6A\n- កម្មង់នៅថ្ងៃទី : ${toOrderInputDate(getTomorrowIsoDate())} ${SYMBOLS.ordered}`
         );
-        lastOrderReminderDate = today;
+        await setPersistentState('last_reminder_date', today);
     } catch (error) {
         console.error('Order reminder error:', error.message);
     }
@@ -568,15 +591,25 @@ const launch = async () => {
     bot = new Telegraf(configuredToken);
     registerHandlers(bot);
 
-    const botInfo = await bot.telegram.getMe();
-    bot.launch().catch(error => {
-        botLaunched = false;
-        console.error('Bot polling error:', error.message);
-    });
-
     botToken = configuredToken;
     botLaunched = true;
-    console.log(`Telegram Bot started as @${botInfo.username}`);
+
+    if (process.env.VERCEL) {
+        console.log('Running on Vercel: Telegram Bot configured for webhooks.');
+    } else {
+        try {
+            const botInfo = await bot.telegram.getMe();
+            bot.launch().catch(error => {
+                botLaunched = false;
+                console.error('Bot polling error:', error.message);
+            });
+            console.log(`Telegram Bot started as @${botInfo.username} (Long Polling)`);
+        } catch (error) {
+            console.error('Bot launch failed:', error.message);
+            botLaunched = false;
+        }
+    }
+
     await syncGroupMuteState();
     return true;
 };
@@ -593,6 +626,7 @@ const stop = async (reason = 'stop') => {
         botToken = '';
         botLaunched = false;
         lastGroupMuteState = null;
+        webhookCallbackCache = null;
     }
 };
 
@@ -649,31 +683,50 @@ const sendCancellationNotification = async (user, order) => {
     }
 };
 
-// ─── Scheduled Tasks ──────────────────────────────────────────────────────────
+// ─── Webhook Middleware for Vercel ───────────────────────────────────────────
+let webhookCallbackCache = null;
 
-// Auto order reminder at admin-configured order start time Cambodia time.
-cron.schedule('* * * * *', () => {
-    sendOrderReminderIfDue();
-}, { timezone: TIME_ZONE });
+const handleWebhook = async (req, res, next) => {
+    const runningBot = await getRunningBot();
+    if (!runningBot) {
+        return res.status(500).send('Bot not initialized');
+    }
+    if (!webhookCallbackCache) {
+        webhookCallbackCache = runningBot.webhookCallback('/api/telegram-webhook');
+    }
+    return webhookCallbackCache(req, res, next);
+};
 
-// Auto report at admin-configured time Cambodia time.
-cron.schedule('* * * * *', () => {
-    sendDailyReportIfDue();
-}, { timezone: TIME_ZONE });
+// ─── Scheduled Tasks (Only active in persistent environments, e.g., Local Dev) ──
+if (!process.env.VERCEL) {
+    // Auto order reminder at admin-configured order start time Cambodia time.
+    cron.schedule('* * * * *', () => {
+        sendOrderReminderIfDue();
+    }, { timezone: TIME_ZONE });
 
-// Keep Telegram group permissions aligned with order time settings.
-cron.schedule('* * * * *', () => {
-    syncGroupMuteState();
-}, { timezone: TIME_ZONE });
+    // Auto report at admin-configured time Cambodia time.
+    cron.schedule('* * * * *', () => {
+        sendDailyReportIfDue();
+    }, { timezone: TIME_ZONE });
+
+    // Keep Telegram group permissions aligned with order time settings.
+    cron.schedule('* * * * *', () => {
+        syncGroupMuteState();
+    }, { timezone: TIME_ZONE });
+}
 
 module.exports = {
     launch,
     restart,
     stop,
+    getRunningBot,
+    handleWebhook,
     syncGroupMuteState,
     sendDailyReport,
     buildDailyReport,
     buildDailySum,
     sendOrderNotification,
-    sendCancellationNotification
+    sendCancellationNotification,
+    sendOrderReminderIfDue,
+    sendDailyReportIfDue
 };
