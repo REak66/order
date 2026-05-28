@@ -220,22 +220,36 @@ const buildDailySum = async (date = new Date()) => {
     const users = await User.find({}).sort({ branch: 1, full_name: 1 });
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
 
-    let report = `📊 សរុបចំនួនដែលបានកម្មង់ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
+    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
     let totalSum = 0;
 
     BRANCHES.forEach(branch => {
-        const orderedCount = users.filter(user => (
+        const orderedUsers = users.filter(user => (
             user.branch === branch.name &&
             orders.some(order => order.user.toString() === user._id.toString())
-        )).length;
+        ));
 
-        report += `📍 ${branch.name}: ${orderedCount} នាក់\n`;
-        totalSum += orderedCount;
+        const count = orderedUsers.length;
+        totalSum += count;
+
+        report += `📍 ${branch.reportLabel}: ${count} នាក់\n\n`;
+
+        if (count === 0) {
+            report += 'មិនមានអ្នកបញ្ជាទិញ\n';
+        } else {
+            report += orderedUsers
+                .map((user, index) => `${index + 1}. ${formatStaffName(user)}`)
+                .join('\n');
+            report += '\n';
+        }
+
+        report += '\n';
     });
 
-    report += `\nសរុបទាំងអស់: ${totalSum} នាក់`;
+    report += `សរុបចំនួនដែលបានកម្មង់: ${totalSum} នាក់\n\n`;
+    report += 'ប្រសិនបើមិនឃើញឈ្មោះរបស់អ្នកសូមទាក់ទង់មកកាន់ @SreyNeang2701 និង @Thaivouchkim សូមអរគុណ!!!';
 
-    return report;
+    return report.trim();
 };
 
 // ─── Bot Lifecycle ────────────────────────────────────────────────────────────
