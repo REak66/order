@@ -431,7 +431,7 @@ const registerHandlers = (telegramBot) => {
             if (!isOrder) {
                 const today = toLocalIsoDate();
                 const expectedOrderDate = getExpectedOrderIsoDate();
-                if (isoDate < today) {
+                if (isoDate <= today) {
                     return replyToMessage(ctx, `${getTelegramMention(ctx)} កាលបរិច្ឆេទកម្មង់ បានផុតកំណត់សម្រាប់លុប។ សូមអរគុណ។ ${SYMBOLS.blocked}`);
                 }
                 if (isoDate > expectedOrderDate) {
