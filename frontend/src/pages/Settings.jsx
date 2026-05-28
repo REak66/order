@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { 
-  Save, 
-  MessageSquare, 
+import {
+  Save,
+  MessageSquare,
   Clock
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -86,8 +86,8 @@ const Settings = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Bot Token</label>
-                <input 
-                  type="password" 
+                <input
+                  type="password"
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
                   placeholder="Enter your bot token"
                   value={settings.bot_token}
@@ -96,8 +96,8 @@ const Settings = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Group ID</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
                   placeholder="-100xxxxxxxxx"
                   value={settings.group_id}
@@ -120,8 +120,8 @@ const Settings = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order Start Time</label>
-                <input 
-                  type="time" 
+                <input
+                  type="time"
                   step="60"
                   required
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
@@ -131,8 +131,8 @@ const Settings = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order End Time</label>
-                <input 
-                  type="time" 
+                <input
+                  type="time"
                   step="60"
                   required
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
@@ -156,7 +156,7 @@ const Settings = () => {
         </div>
 
         <div className="flex justify-end">
-          <button 
+          <button
             type="submit"
             disabled={saving}
             className="flex items-center gap-2 px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
