@@ -5,9 +5,7 @@ import {
   CalendarRange,
   Calendar,
   Building,
-  PlusCircle,
-  Search,
-  XCircle
+  Search
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { addDays, endOfWeek, format, startOfWeek } from 'date-fns';
@@ -125,19 +123,6 @@ const Reports = () => {
     }
   };
 
-  const handleManualStatus = async (report, status) => {
-    try {
-      await api.post('/api/reports/manual-order', {
-        userId: report.user_id,
-        orderDate: report.order_date,
-        status
-      });
-      toast.success(status === 'ordered' ? 'Manual order saved' : 'Manual cancel saved');
-      fetchReports();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to save manual status');
-    }
-  };
 
   const updatePeriod = (period) => {
     const range = getPeriodRange(period, new Date(`${filters.date}T00:00:00`));
@@ -316,7 +301,6 @@ const Reports = () => {
                   <th className="px-6 py-4 font-semibold">Branch</th>
                   <th className="px-6 py-4 font-semibold">Order Date</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
               )}
             </thead>
@@ -325,7 +309,7 @@ const Reports = () => {
                 {loading ? (
                   [1, 2, 3].map(i => (
                     <tr key={`loading-${i}`} className="animate-pulse">
-                      <td colSpan={isMonthlyReport ? daysInMonth + 4 : isSummaryReport ? 6 : 5} className="px-6 py-4"><div className="h-6 bg-slate-100 dark:bg-slate-800 rounded" /></td>
+                      <td colSpan={isMonthlyReport ? daysInMonth + 4 : isSummaryReport ? 6 : 4} className="px-6 py-4"><div className="h-6 bg-slate-100 dark:bg-slate-800 rounded" /></td>
                     </tr>
                   ))
                 ) : displayedReports.length === 0 ? (
@@ -333,7 +317,7 @@ const Reports = () => {
                     key="empty"
                     className="motion-preset-fade motion-duration-350"
                   >
-                    <td colSpan={isMonthlyReport ? daysInMonth + 4 : isSummaryReport ? 6 : 5} className="px-6 py-12 text-center text-slate-500">No records found for the selected criteria</td>
+                    <td colSpan={isMonthlyReport ? daysInMonth + 4 : isSummaryReport ? 6 : 4} className="px-6 py-12 text-center text-slate-500">No records found for the selected criteria</td>
                   </tr>
                 ) : (
                   displayedReports.map((report, index) => {
@@ -381,66 +365,26 @@ const Reports = () => {
                         <td className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">{report.not_ordered}</td>
                       </tr>
                     ) : (
-                      (() => {
-                        const canCancelToday = report.order_date === todayIso;
-                        const cancelDisabled = report.status === 'cancelled' || !canCancelToday;
-
-                        return (
-                          <tr
-                            key={rowKey}
-                            className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-350"
-                          >
-                            <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{report.full_name}</td>
-                            <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{report.branch}</td>
-                            <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                              {report.order_date ? format(new Date(report.order_date), 'MMM dd, yyyy') : '-'}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={cn(
-                                "px-3 py-1 rounded-full text-xs font-semibold transition-colors duration-200",
-                                report.status === 'ordered' && "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
-                                report.status === 'cancelled' && "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400",
-                                report.status === 'not_ordered' && "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-                              )}>
-                                {report.status === 'not_ordered' ? 'Not Order' : report.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleManualStatus(report, 'ordered')}
-                                  disabled={report.status === 'ordered'}
-                                  className={cn(
-                                    "inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
-                                    report.status === 'ordered'
-                                      ? "bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 hover:scale-100 active:scale-100"
-                                      : "bg-primary-600 text-white hover:bg-primary-700 shadow-sm shadow-primary-600/5"
-                                  )}
-                                >
-                                  <PlusCircle size={16} />
-                                  <span>{report.status === 'ordered' ? 'Ordered' : 'Order'}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleManualStatus(report, 'cancelled')}
-                                  disabled={cancelDisabled}
-                                  title={!canCancelToday ? 'Cancel is allowed only for today' : undefined}
-                                  className={cn(
-                                    "inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
-                                    cancelDisabled
-                                      ? "bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 hover:scale-100 active:scale-100"
-                                      : "bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-600/5"
-                                  )}
-                                >
-                                  <XCircle size={16} />
-                                  <span>{report.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })()
+                      <tr
+                        key={rowKey}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-350"
+                      >
+                        <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{report.full_name}</td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{report.branch}</td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                          {report.order_date ? format(new Date(report.order_date), 'MMM dd, yyyy') : '-'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={cn(
+                            "px-3 py-1 rounded-full text-xs font-semibold transition-colors duration-200",
+                            report.status === 'ordered' && "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
+                            report.status === 'cancelled' && "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400",
+                            report.status === 'not_ordered' && "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                          )}>
+                            {report.status === 'not_ordered' ? 'Not Order' : report.status}
+                          </span>
+                        </td>
+                      </tr>
                     );
                   })
                 )}
