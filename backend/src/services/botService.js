@@ -213,6 +213,31 @@ const buildDailyReport = async (date = new Date()) => {
     return report.trim();
 };
 
+const buildDailySum = async (date = new Date()) => {
+    const lunchDate = getTomorrowDate(date);
+    const orderDate = toLocalIsoDate(lunchDate);
+    const displayDate = toDisplayDate(lunchDate);
+    const users = await User.find({}).sort({ branch: 1, full_name: 1 });
+    const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
+
+    let report = `📊 សរុបចំនួនដែលបានកម្មង់ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
+    let totalSum = 0;
+
+    BRANCHES.forEach(branch => {
+        const orderedCount = users.filter(user => (
+            user.branch === branch.name &&
+            orders.some(order => order.user.toString() === user._id.toString())
+        )).length;
+
+        report += `📍 ${branch.name}: ${orderedCount} នាក់\n`;
+        totalSum += orderedCount;
+    });
+
+    report += `\nសរុបទាំងអស់: ${totalSum} នាក់`;
+
+    return report;
+};
+
 // ─── Bot Lifecycle ────────────────────────────────────────────────────────────
 
 const getRunningBot = async () => {
@@ -491,6 +516,16 @@ const registerHandlers = (telegramBot) => {
         }
     });
 
+    telegramBot.command('sum', async (ctx) => {
+        try {
+            const report = await buildDailySum();
+            return ctx.reply(report);
+        } catch (error) {
+            console.error('Manual sum report error:', error.message);
+            return ctx.reply('មានបញ្ហាក្នុងការបង្កើតរបាយការណ៍សរុប។');
+        }
+    });
+
     telegramBot.command('chatid', async (ctx) => {
         return ctx.reply(`លេខសម្គាល់ក្រុម Chat ID: ${ctx.chat.id}`);
     });
@@ -616,6 +651,7 @@ module.exports = {
     syncGroupMuteState,
     sendDailyReport,
     buildDailyReport,
+    buildDailySum,
     sendOrderNotification,
     sendCancellationNotification
 };
