@@ -215,16 +215,28 @@ const buildDailyReport = async (date = new Date()) => {
 
 // ─── Bot Lifecycle ────────────────────────────────────────────────────────────
 
-const ensureBot = () => {
-    if (!botLaunched || !bot) {
+const getRunningBot = async () => {
+    if (bot) return bot;
+
+    const configuredToken = await getConfiguredBotToken();
+    if (!configuredToken) {
         console.warn('Telegram bot is not running. Check BOT_TOKEN or saved bot_token setting.');
         return null;
     }
-    return bot;
+
+    try {
+        bot = new Telegraf(configuredToken);
+        registerHandlers(bot);
+        botToken = configuredToken;
+        return bot;
+    } catch (error) {
+        console.error('Failed to initialize Telegram bot on demand:', error.message);
+        return null;
+    }
 };
 
 const syncGroupMuteState = async () => {
-    const runningBot = ensureBot();
+    const runningBot = await getRunningBot();
     if (!runningBot) return;
 
     const groupId = await getGroupId();
@@ -260,7 +272,7 @@ const syncGroupMuteState = async () => {
 };
 
 const sendDailyReport = async () => {
-    const runningBot = ensureBot();
+    const runningBot = await getRunningBot();
     if (!runningBot) return false;
 
     const GROUP_ID = await getGroupId();
@@ -292,7 +304,7 @@ const sendDailyReportIfDue = async () => {
 const sendOrderReminderIfDue = async () => {
     if (!(await isCurrentSettingTime('order_start_time'))) return;
 
-    const runningBot = ensureBot();
+    const runningBot = await getRunningBot();
     if (!runningBot) return;
 
     const today = toLocalIsoDate();
@@ -527,7 +539,7 @@ const restart = async () => {
 // ─── Notification Helpers ────────────────────────────────────────────────────
 
 const sendOrderNotification = async (user, order) => {
-    const runningBot = ensureBot();
+    const runningBot = await getRunningBot();
     if (!runningBot) return false;
 
     const groupId = await getGroupId();
@@ -550,7 +562,7 @@ const sendOrderNotification = async (user, order) => {
 };
 
 const sendCancellationNotification = async (user, order) => {
-    const runningBot = ensureBot();
+    const runningBot = await getRunningBot();
     if (!runningBot) return false;
 
     const groupId = await getGroupId();

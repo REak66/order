@@ -9,7 +9,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 // Initialize database connection
-const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/lunch_order_db';
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/lunch_order_db';
 
 async function testOrderNotifications() {
     try {

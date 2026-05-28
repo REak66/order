@@ -37,15 +37,26 @@ const reportRoutes = require('./routes/reportRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 
+// Root status endpoint
 app.get('/', (req, res) => {
     res.json({ message: 'Order Lunch backend is running' });
 });
 
-app.use('/auth', authRoutes);
-app.use('/staff', staffRoutes);
-app.use('/reports', reportRoutes);
-app.use('/settings', settingsRoutes);
-app.use('/dashboard', dashboardRoutes);
+// Root status endpoint also at /api/
+app.get('/api', (req, res) => {
+    res.json({ message: 'Order Lunch API is running' });
+});
+
+// Configure API Router to handle both prefixed (/api) and non-prefixed routes for robustness
+const apiRouter = express.Router();
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/staff', staffRoutes);
+apiRouter.use('/reports', reportRoutes);
+apiRouter.use('/settings', settingsRoutes);
+apiRouter.use('/dashboard', dashboardRoutes);
+
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 app.use((req, res) => {
     res.status(404).json({ message: 'Not Found' });
@@ -92,14 +103,16 @@ const initDatabase = async () => {
     }
 };
 
+// Initialize DB and connection globally (crucial for Vercel Serverless Functions)
+connectDB().then(() => {
+    initDatabase().catch(err => console.error('Database initialization error:', err.message));
+}).catch(err => console.error('Database connection error:', err.message));
+
 // Start Bot and Server
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
     try {
-        await connectDB();
-        await initDatabase();
-
         bot.launch().catch(err => console.error('Bot launch error:', err.message));
 
         const server = app.listen(PORT, () => {
