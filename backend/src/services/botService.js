@@ -393,11 +393,12 @@ const registerHandlers = (telegramBot) => {
         const text = ctx.message.text;
         const telegramId = ctx.from.id;
 
-        const orderMatch = text.match(/[-*]\s*Name\s*:\s*(.+)\r?\n[-*]\s*Brand\s*:\s*(.+)\r?\n[-*]\s*Order on\s*(\d{2}-\d{2}-\d{4})\s*.*/i);
-        const cancelMatch = text.match(/[-*]\s*Name\s*:\s*(.+)\r?\n[-*]\s*Brand\s*:\s*(.+)\r?\n[-*]\s*Cancel on\s*(\d{2}-\d{2}-\d{4})\s*.*/i);
+        const orderMatch = text.match(/[-*]\s*(?:Name|ឈ្មោះ)\s*:\s*(.+)\r?\n[-*]\s*(?:Brand|សាខា)\s*:\s*(.+)\r?\n[-*]\s*(?:Order on|កម្មង់ថ្ងៃទី|កម្មង់នៅថ្ងៃទី|កាលបរិច្ឆេទ)\s*:?\s*(\d{2}-\d{2}-\d{4})\s*.*/i);
+        const cancelMatch = text.match(/[-*]\s*(?:Name|ឈ្មោះ)\s*:\s*(.+)\r?\n[-*]\s*(?:Brand|សាខា)\s*:\s*(.+)\r?\n[-*]\s*(?:Cancel on|លុបថ្ងៃទី)\s*:?\s*(\d{2}-\d{2}-\d{4})\s*.*/i);
 
         if (!orderMatch && !cancelMatch) {
-            if (text.includes('Name') || text.includes('Brand') || text.includes('Order on') || text.includes('Cancel on')) {
+            const hasKeyword = ['Name', 'Brand', 'Order on', 'Cancel on', 'ឈ្មោះ', 'សាខា', 'កម្មង់ថ្ងៃទី', 'កម្មង់នៅថ្ងៃទី', 'កាលបរិច្ឆេទ', 'លុបថ្ងៃទី'].some(keyword => text.includes(keyword));
+            if (hasKeyword) {
                 return replyToMessage(ctx, 'ទម្រង់មិនត្រឹមត្រូវ។ សូមប្រើតាមគំរូបញ្ជាទិញ/លុបការបញ្ជាទិញ។');
             }
             return;
