@@ -221,7 +221,10 @@ const buildDailySum = async (date = new Date()) => {
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
 
     let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
-    let totalSum = 0;
+    const totalSum = users.filter(user =>
+        BRANCHES.some(branch => branch.name === user.branch) &&
+        orders.some(order => order.user.toString() === user._id.toString())
+    ).length;
 
     BRANCHES.forEach(branch => {
         const orderedUsers = users.filter(user => (
@@ -230,12 +233,13 @@ const buildDailySum = async (date = new Date()) => {
         ));
 
         const count = orderedUsers.length;
-        totalSum += count;
 
         report += `📍 ${branch.reportLabel}: ${count} នាក់\n\n`;
 
         if (count === 0) {
-            report += 'មិនមានអ្នកបញ្ជាទិញ\n';
+            if (totalSum === 0) {
+                report += 'មិនមានអ្នកបញ្ជាទិញ\n';
+            }
         } else {
             report += orderedUsers
                 .map((user, index) => `${index + 1}. ${formatStaffName(user)}`)
@@ -243,10 +247,14 @@ const buildDailySum = async (date = new Date()) => {
             report += '\n';
         }
 
-        report += '\n';
+        if (count > 0 || totalSum === 0) {
+            report += '\n';
+        }
     });
 
-    report += `សរុបចំនួនដែលបានកម្មង់: ${totalSum} នាក់\n\n`;
+    if (totalSum > 0) {
+        report += `សរុបចំនួនដែលបានកម្មង់: ${totalSum} នាក់\n\n`;
+    }
     report += 'ប្រសិនបើមិនឃើញឈ្មោះរបស់អ្នកសូមទាក់ទង់មកកាន់ @SreyNeang2701 និង @Thaivouchkim សូមអរគុណ!!!';
 
     return report.trim();
