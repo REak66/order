@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../utils/api';
-import { Calendar, CheckCircle, Search, Utensils, XCircle } from 'lucide-react';
+import { Calendar, CheckCircle, Search, Utensils, XCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { addDays, format } from 'date-fns';
 import SearchSelect from '../components/SearchSelect';
@@ -11,25 +11,24 @@ const tomorrowIso = format(addDays(new Date(), 1), 'yyyy-MM-dd');
 const branches = ['City Mall', 'BYD 6A', 'BYD 60M'];
 
 const branchOptions = branches.map(branch => ({ value: branch, label: branch }));
-const statusOptions = [
-  { value: 'ordered', label: 'Ordered' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'not_ordered', label: 'Not Order' }
-];
 
 
 const ManualOrder = () => {
   const [staff, setStaff] = useState([]);
+  const [orderStatuses, setOrderStatuses] = useState({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [orderDate, setOrderDate] = useState(tomorrowIso);
-  const [status, setStatus] = useState('ordered');
   const [selectedBranches, setSelectedBranches] = useState({});
 
   useEffect(() => {
     fetchStaff();
   }, []);
+
+  useEffect(() => {
+    fetchOrderStatuses(orderDate);
+  }, [orderDate]);
 
   const fetchStaff = async () => {
     setLoading(true);
@@ -43,6 +42,23 @@ const ManualOrder = () => {
       toast.error('Failed to fetch staff');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOrderStatuses = async (date) => {
+    try {
+      const res = await api.get('/api/reports', {
+        params: {
+          period: 'daily',
+          date: date
+        }
+      });
+      const statusMap = Object.fromEntries(
+        res.data.map(item => [item.user_id, item.status])
+      );
+      setOrderStatuses(statusMap);
+    } catch (error) {
+      console.error('Failed to fetch order statuses:', error);
     }
   };
 
@@ -65,25 +81,32 @@ const ManualOrder = () => {
     }));
   };
 
-  const saveManualOrder = async (member) => {
+  const saveManualOrder = async (member, targetStatus) => {
     const memberId = member._id || member.id;
     const branch = selectedBranches[memberId] || member.branch || 'City Mall';
 
-    if (status === 'cancelled' && orderDate !== todayIso) {
+    if (targetStatus === 'cancelled' && orderDate !== todayIso) {
       toast.error('Cancel order is allowed only for today');
       return;
     }
 
-    setSavingId(memberId);
+    setSavingId(`${memberId}-${targetStatus}`);
     try {
       await api.post('/api/reports/manual-order', {
         userId: memberId,
         orderDate,
-        status,
+        status: targetStatus,
         branch
       });
-      toast.success(status === 'ordered' ? 'Manual order saved' : status === 'cancelled' ? 'Manual cancel saved' : 'Manual order cleared');
+      toast.success(
+        targetStatus === 'ordered' 
+          ? 'Manual order saved' 
+          : targetStatus === 'cancelled' 
+            ? 'Manual cancel saved' 
+            : 'Manual order cleared'
+      );
       fetchStaff();
+      fetchOrderStatuses(orderDate);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save manual order');
     } finally {
@@ -114,21 +137,6 @@ const ManualOrder = () => {
           />
         </div>
 
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
-            <Utensils size={12} />
-            Status
-          </label>
-          <SearchSelect
-            options={statusOptions}
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            placeholder="Select Status"
-            hasSearch={false}
-            className="min-w-[160px]"
-          />
-        </div>
-
         <div className="space-y-1 min-w-[260px] flex-1">
           <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
             <Search size={12} />
@@ -156,6 +164,7 @@ const ManualOrder = () => {
                 <th className="px-6 py-4 font-semibold">Username</th>
                 <th className="px-6 py-4 font-semibold">Telegram ID</th>
                 <th className="px-6 py-4 font-semibold">Branch</th>
+                <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold text-right">Action</th>
               </tr>
             </thead>
@@ -164,7 +173,7 @@ const ManualOrder = () => {
                 {loading ? (
                   [1, 2, 3].map(item => (
                     <tr key={`loading-${item}`} className="animate-pulse">
-                      <td colSpan="5" className="px-6 py-4">
+                      <td colSpan="6" className="px-6 py-4">
                         <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded" />
                       </td>
                     </tr>
@@ -172,20 +181,25 @@ const ManualOrder = () => {
                 ) : filteredStaff.length === 0 ? (
                   <tr
                     key="empty"
-                    className="motion-preset-fade motion-duration-350"
+                    className="motion-preset-fade motion-duration-200"
                   >
-                    <td colSpan="5" className="px-6 py-12 text-center text-slate-500">No staff found</td>
+                    <td colSpan="6" className="px-6 py-12 text-center text-slate-500">No staff found</td>
                   </tr>
                 ) : (
                   filteredStaff.map(member => {
                     const memberId = member._id || member.id;
-                    const isSaving = savingId === memberId;
-                    const isCancelBlocked = status === 'cancelled' && orderDate !== todayIso;
+                    const currentStatus = orderStatuses[memberId] || 'not_ordered';
+                    const isSavingOrder = savingId === `${memberId}-ordered`;
+                    const isSavingCancel = savingId === `${memberId}-cancelled`;
+                    const isSavingClear = savingId === `${memberId}-not_ordered`;
+                    const isRowSaving = !!savingId && savingId.startsWith(memberId);
+                    
+                    const isCancelDisabled = orderDate !== todayIso;
 
                     return (
                       <tr
                         key={memberId}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-350"
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
                       >
                         <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{member.full_name}</td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">@{member.username || 'N/A'}</td>
@@ -200,23 +214,58 @@ const ManualOrder = () => {
                             className="min-w-[145px]"
                           />
                         </td>
+                        <td className="px-6 py-4">
+                          <span className={cn(
+                            "px-3 py-1 rounded-full text-xs font-semibold transition-colors duration-200 inline-block",
+                            currentStatus === 'ordered' && "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
+                            currentStatus === 'cancelled' && "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400",
+                            currentStatus === 'not_ordered' && "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                          )}>
+                            {currentStatus === 'not_ordered' ? 'Not Order' : currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => saveManualOrder(member)}
-                            disabled={isSaving || isCancelBlocked}
-                            className={cn(
-                              "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
-                              isSaving || isCancelBlocked
-                                ? "bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 hover:scale-100 active:scale-100"
-                                : status === 'cancelled'
-                                  ? "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-600/10"
-                                  : "bg-primary-600 text-white hover:bg-primary-700 shadow-md shadow-primary-600/10"
+                          <div className="inline-flex items-center gap-2 justify-end">
+                            {/* Order Button */}
+                            {currentStatus !== 'ordered' && (
+                              <button
+                                type="button"
+                                onClick={() => saveManualOrder(member, 'ordered')}
+                                disabled={isRowSaving}
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] bg-primary-600 text-white hover:bg-primary-700 shadow-sm shadow-primary-600/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <CheckCircle size={14} />
+                                <span>{isSavingOrder ? 'Saving...' : 'Order'}</span>
+                              </button>
                             )}
-                          >
-                            {status === 'cancelled' ? <XCircle size={16} /> : <CheckCircle size={16} />}
-                            <span>{isSaving ? 'Saving...' : status === 'ordered' ? 'Save Order' : status === 'cancelled' ? 'Save Cancel' : 'Clear Order'}</span>
-                          </button>
+
+                            {/* Cancel Button */}
+                            {currentStatus !== 'cancelled' && (
+                              <button
+                                type="button"
+                                onClick={() => saveManualOrder(member, 'cancelled')}
+                                disabled={isRowSaving || isCancelDisabled}
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-600/10 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none dark:disabled:bg-slate-800"
+                                title={isCancelDisabled ? 'Cancellation is allowed for today\'s date only' : 'Cancel Order'}
+                              >
+                                <XCircle size={14} />
+                                <span>{isSavingCancel ? 'Saving...' : 'Cancel'}</span>
+                              </button>
+                            )}
+
+                            {/* Clear Button */}
+                            {currentStatus !== 'not_ordered' && (
+                              <button
+                                type="button"
+                                onClick={() => saveManualOrder(member, 'not_ordered')}
+                                disabled={isRowSaving}
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <RotateCcw size={14} />
+                                <span>{isSavingClear ? 'Clearing...' : 'Clear'}</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

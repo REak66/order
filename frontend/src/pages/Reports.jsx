@@ -315,7 +315,7 @@ const Reports = () => {
                 ) : displayedReports.length === 0 ? (
                   <tr
                     key="empty"
-                    className="motion-preset-fade motion-duration-350"
+                    className="motion-preset-fade motion-duration-200"
                   >
                     <td colSpan={isMonthlyReport ? daysInMonth + 4 : isSummaryReport ? 6 : 4} className="px-6 py-12 text-center text-slate-500">No records found for the selected criteria</td>
                   </tr>
@@ -330,7 +330,7 @@ const Reports = () => {
                     return isMonthlyReport ? (
                       <tr
                         key={rowKey}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-350"
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
                       >
                         <td className="px-3 py-3 text-center text-slate-500 dark:text-slate-400">{index + 1}</td>
                         <td className="px-4 py-3 font-medium text-slate-800 dark:text-white">{report.full_name}</td>
@@ -353,7 +353,7 @@ const Reports = () => {
                     ) : isSummaryReport ? (
                       <tr
                         key={rowKey}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-350"
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
                       >
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
                           {report.order_date ? format(new Date(report.order_date), 'MMM dd, yyyy') : '-'}
@@ -367,7 +367,7 @@ const Reports = () => {
                     ) : (
                       <tr
                         key={rowKey}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-350"
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
                       >
                         <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{report.full_name}</td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{report.branch}</td>

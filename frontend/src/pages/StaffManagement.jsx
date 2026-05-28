@@ -154,7 +154,7 @@ const StaffManagement = () => {
                 ) : filteredStaff.length === 0 ? (
                   <tr
                     key="empty"
-                    className="motion-preset-fade motion-duration-350"
+                    className="motion-preset-fade motion-duration-200"
                   >
                     <td colSpan="5" className="px-6 py-12 text-center text-slate-500">No staff found</td>
                   </tr>
@@ -162,7 +162,7 @@ const StaffManagement = () => {
                   filteredStaff.map((member) => (
                     <tr
                       key={member._id || member.id}
-                      className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-350"
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
                     >
                       <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{member.full_name}</td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400">@{member.username}</td>
@@ -199,13 +199,13 @@ const StaffManagement = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Animated Overlay Backdrop */}
           <div
-            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm motion-preset-fade motion-duration-350"
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm motion-preset-fade motion-duration-200"
             onClick={() => setIsModalOpen(false)}
           />
 
           {/* Animated Modal Dialog */}
           <div
-            className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 motion-preset-fade motion-duration-350"
+            className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 motion-preset-fade motion-duration-200"
           >
               <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="text-xl font-bold text-slate-800 dark:text-white">
