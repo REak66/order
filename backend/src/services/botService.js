@@ -681,6 +681,28 @@ const sendCancellationNotification = async (user, order) => {
     }
 };
 
+const sendBranchUpdateNotification = async (user, order) => {
+    const runningBot = await getRunningBot();
+    if (!runningBot) return false;
+
+    const groupId = await getGroupId();
+    if (!groupId) return false;
+
+    try {
+        const displayDate = toDisplayDate(new Date(order.order_date));
+        const message = `🔄 *Branch Updated*\n\n` +
+            `👤 *ឈ្មោះ:* ${user.full_name || 'Unknown'}\n` +
+            `🏢 *សាខាថ្មី:* ${user.branch}\n` +
+            `📅 *ថ្ងៃទី:* ${displayDate}`;
+
+        await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
+        return true;
+    } catch (error) {
+        console.error('Branch update notification error:', error.message);
+        return false;
+    }
+};
+
 // ─── Webhook Middleware for Vercel ───────────────────────────────────────────
 let webhookCallbackCache = null;
 
@@ -725,6 +747,8 @@ module.exports = {
     buildDailySum,
     sendOrderNotification,
     sendCancellationNotification,
+    sendBranchUpdateNotification,
     sendOrderReminderIfDue,
     sendDailyReportIfDue
 };
+

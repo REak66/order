@@ -1,15 +1,16 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-    telegram_id: { type: Number, unique: true },
+    telegram_id: { type: Number, sparse: true },
     username: String,
-    full_name: String,
+    full_name: { type: String, required: true },
+    phone_number: { type: String, unique: true, sparse: true },
     branch: { 
         type: String, 
         enum: ['City Mall', 'BYD 6A', 'BYD 60M'],
         default: 'City Mall'
     },
-    role: { type: String, default: 'staff' },
+    role: { type: String, enum: ['staff', 'admin'], default: 'staff' },
     created_at: { type: Date, default: Date.now }
 });
 

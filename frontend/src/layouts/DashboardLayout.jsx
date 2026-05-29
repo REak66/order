@@ -121,8 +121,8 @@ const DashboardLayout = () => {
 
           <div className="flex items-center gap-4 ml-auto">
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-sm font-semibold text-slate-800 dark:text-white">{admin?.username}</span>
-              <span className="text-xs text-slate-500">Administrator</span>
+              <span className="text-sm font-semibold text-slate-800 dark:text-white">{admin?.username || 'Admin'}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Administrator</span>
             </div>
             <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full">
               <User size={20} className="text-slate-600 dark:text-slate-400" />

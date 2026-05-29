@@ -27,7 +27,8 @@ const StaffManagement = () => {
     telegram_id: '',
     username: '',
     full_name: '',
-    branch: 'City Mall'
+    branch: 'City Mall',
+    phone_number: ''
   });
 
   useEffect(() => {
@@ -81,7 +82,8 @@ const StaffManagement = () => {
       telegram_id: member.telegram_id || '',
       username: member.username || '',
       full_name: member.full_name || '',
-      branch: member.branch || 'City Mall'
+      branch: member.branch || 'City Mall',
+      phone_number: member.phone_number || ''
     });
     setIsModalOpen(true);
   };
@@ -92,7 +94,8 @@ const StaffManagement = () => {
       telegram_id: '',
       username: '',
       full_name: '',
-      branch: 'City Mall'
+      branch: 'City Mall',
+      phone_number: ''
     });
   };
 
@@ -138,6 +141,7 @@ const StaffManagement = () => {
               <tr>
                 <th className="px-6 py-4 font-semibold">Full Name</th>
                 <th className="px-6 py-4 font-semibold">Username</th>
+                <th className="px-6 py-4 font-semibold">Phone</th>
                 <th className="px-6 py-4 font-semibold">Telegram ID</th>
                 <th className="px-6 py-4 font-semibold">Branch</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
@@ -148,7 +152,7 @@ const StaffManagement = () => {
                 {loading ? (
                   [1, 2, 3].map(i => (
                     <tr key={`loading-${i}`} className="animate-pulse">
-                      <td colSpan="5" className="px-6 py-4"><div className="h-6 bg-slate-100 dark:bg-slate-800 rounded" /></td>
+                      <td colSpan="6" className="px-6 py-4"><div className="h-6 bg-slate-100 dark:bg-slate-800 rounded" /></td>
                     </tr>
                   ))
                 ) : filteredStaff.length === 0 ? (
@@ -156,7 +160,7 @@ const StaffManagement = () => {
                     key="empty"
                     className="motion-preset-fade motion-duration-200"
                   >
-                    <td colSpan="5" className="px-6 py-12 text-center text-slate-500">No staff found</td>
+                    <td colSpan="6" className="px-6 py-12 text-center text-slate-500">No staff found</td>
                   </tr>
                 ) : (
                   filteredStaff.map((member) => (
@@ -166,6 +170,9 @@ const StaffManagement = () => {
                     >
                       <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{member.full_name}</td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400">@{member.username}</td>
+                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-sm">
+                        {member.phone_number || <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-sm">{member.telegram_id}</td>
                       <td className="px-6 py-4">
                         <span className="px-3 py-1 bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400 rounded-full text-xs font-semibold">
@@ -228,6 +235,17 @@ const StaffManagement = () => {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    required
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
+                    placeholder="e.g. 0xx-xxx-xxxx"
+                    value={formData.phone_number}
+                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Telegram Username</label>
                   <input
                     type="text"
@@ -240,7 +258,6 @@ const StaffManagement = () => {
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Telegram ID</label>
                   <input
                     type="number"
-                    required
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
                     value={formData.telegram_id}
                     onChange={(e) => setFormData({ ...formData, telegram_id: e.target.value })}

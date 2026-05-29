@@ -7,15 +7,19 @@ exports.getAllStaff = asyncHandler(async (req, res) => {
 });
 
 exports.addStaff = asyncHandler(async (req, res) => {
-    const { telegram_id, username, full_name, branch } = req.body;
-    const staff = await User.create({ telegram_id, username, full_name, branch });
+    const { telegram_id, username, full_name, branch, phone_number } = req.body;
+    const staff = await User.create({ telegram_id, username, full_name, branch, phone_number });
     res.status(201).json(staff);
 });
 
 exports.updateStaff = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { telegram_id, username, full_name, branch } = req.body;
-    const staff = await User.findByIdAndUpdate(id, { telegram_id, username, full_name, branch }, { new: true });
+    const { telegram_id, username, full_name, branch, phone_number } = req.body;
+    const staff = await User.findByIdAndUpdate(
+        id,
+        { telegram_id, username, full_name, branch, phone_number },
+        { new: true }
+    );
     res.json(staff);
 });
 

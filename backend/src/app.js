@@ -37,6 +37,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const cronRoutes = require('./routes/cronRoutes');
+const staffPortalRoutes = require('./routes/staffPortalRoutes');
 
 // Root status endpoint
 app.get('/', (req, res) => {
@@ -64,6 +65,7 @@ apiRouter.use('/reports', reportRoutes);
 apiRouter.use('/settings', settingsRoutes);
 apiRouter.use('/dashboard', dashboardRoutes);
 apiRouter.use('/cron', cronRoutes);
+apiRouter.use('/portal', staffPortalRoutes);
 apiRouter.use('/', cronRoutes);
 
 app.use('/api', apiRouter);
