@@ -55,8 +55,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Staff login
-  const staffLogin = async (phone_number) => {
-    const res = await api.post('/api/auth/staff-login', { phone_number });
+  const staffLogin = async (username, password) => {
+    const res = await api.post('/api/auth/staff-login', { username, password });
     const { token, user } = res.data;
     localStorage.setItem('token', token);
     localStorage.setItem('role', 'staff');
@@ -93,6 +93,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       admin,
       user,
+      setUser,
       currentUser,
       token,
       role,

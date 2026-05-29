@@ -25,11 +25,23 @@ const ManualOrder = () => {
 
   useEffect(() => {
     fetchStaff();
+    fetchDefaultDate();
   }, []);
 
   useEffect(() => {
     fetchOrderStatuses(orderDate);
   }, [orderDate]);
+
+  const fetchDefaultDate = async () => {
+    try {
+      const res = await api.get('/api/dashboard/stats');
+      if (res.data && res.data.lunchDate) {
+        setOrderDate(res.data.lunchDate);
+      }
+    } catch (error) {
+      console.error('Failed to fetch default order date:', error);
+    }
+  };
 
   const fetchStaff = async () => {
     setLoading(true);

@@ -9,7 +9,7 @@ const toLocalIsoDate = (date = new Date()) => {
     }).format(date);
 };
 
-const toIsoDate = (date) => date.toISOString().split('T')[0];
+const toIsoDate = (date) => toLocalIsoDate(date);
 
 const addDays = (date, days) => {
     const nextDate = new Date(date);
@@ -55,8 +55,34 @@ const toOrderInputDate = (isoDate) => {
     return `${day}-${month}-${year}`;
 };
 
+const getLunchDate = (date = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(date);
+    
+    const map = {};
+    parts.forEach(p => { map[p.type] = p.value; });
+    
+    const year = Number(map.year);
+    const month = Number(map.month);
+    const day = Number(map.day);
+    
+    const localDate = new Date(year, month - 1, day);
+    const next = new Date(localDate);
+    next.setDate(localDate.getDate() + 1);
+
+    const yyyy = next.getFullYear();
+    const mm = String(next.getMonth() + 1).padStart(2, '0');
+    const dd = String(next.getDate()).padStart(2, '0');
+
+    return `${yyyy}-${mm}-${dd}`;
+};
+
 const getExpectedOrderIsoDate = () => {
-    return getTomorrowIsoDate(new Date());
+    return getLunchDate(new Date());
 };
 
 const isTomorrowOrderDate = (orderIsoDate) => {
@@ -168,5 +194,6 @@ module.exports = {
     getMonthlyReportMeta,
     getMonthlyExportRows,
     getMonthlyDayStatus,
-    getDateRange
+    getDateRange,
+    getLunchDate
 };

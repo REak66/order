@@ -65,12 +65,29 @@ exports.updateSettings = asyncHandler(async (req, res) => {
         settings.group_id = normalizedGroupId;
     }
 
+    // Fetch existing settings to detect changes in times
+    const existingSettings = await Setting.find({ key: { $in: ['report_time', 'order_start_time'] } });
+    const oldReportTime = existingSettings.find(s => s.key === 'report_time')?.value || '';
+    const oldOrderStartTime = existingSettings.find(s => s.key === 'order_start_time')?.value || '';
+
     for (const [key, value] of Object.entries(settings)) {
         await Setting.findOneAndUpdate(
             { key },
             { value, updated_at: Date.now() },
             { upsert: true }
         );
+    }
+
+    // If report_time was changed, clear last_report_date to allow immediate testing/triggering
+    if (settings.report_time && settings.report_time !== oldReportTime) {
+        await Setting.deleteOne({ key: 'last_report_date' });
+        console.log(`Cleared last_report_date because report_time changed from ${oldReportTime} to ${settings.report_time}`);
+    }
+
+    // If order_start_time was changed, clear last_reminder_date
+    if (settings.order_start_time && settings.order_start_time !== oldOrderStartTime) {
+        await Setting.deleteOne({ key: 'last_reminder_date' });
+        console.log(`Cleared last_reminder_date because order_start_time changed from ${oldOrderStartTime} to ${settings.order_start_time}`);
     }
 
     if (shouldRestartBot) {

@@ -28,7 +28,8 @@ const StaffManagement = () => {
     username: '',
     full_name: '',
     branch: 'City Mall',
-    phone_number: ''
+    phone_number: '',
+    password: ''
   });
 
   useEffect(() => {
@@ -60,7 +61,7 @@ const StaffManagement = () => {
       fetchStaff();
       resetForm();
     } catch (error) {
-      toast.error('Operation failed');
+      toast.error(error.response?.data?.message || 'Operation failed');
     }
   };
 
@@ -83,7 +84,8 @@ const StaffManagement = () => {
       username: member.username || '',
       full_name: member.full_name || '',
       branch: member.branch || 'City Mall',
-      phone_number: member.phone_number || ''
+      phone_number: member.phone_number || '',
+      password: ''
     });
     setIsModalOpen(true);
   };
@@ -95,7 +97,8 @@ const StaffManagement = () => {
       username: '',
       full_name: '',
       branch: 'City Mall',
-      phone_number: ''
+      phone_number: '',
+      password: ''
     });
   };
 
@@ -246,9 +249,10 @@ const StaffManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Telegram Username</label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Username (for Login / Telegram)</label>
                   <input
                     type="text"
+                    required
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -261,6 +265,20 @@ const StaffManagement = () => {
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
                     value={formData.telegram_id}
                     onChange={(e) => setFormData({ ...formData, telegram_id: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Password <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
+                      {editingStaff ? '(leave blank to keep unchanged)' : '(leave blank to default to Phone Number)'}
+                    </span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder={editingStaff ? "••••••••" : "Enter password (optional)"}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   />
                 </div>
                 <div>

@@ -17,7 +17,8 @@ import {
   CalendarDays,
   Pencil,
   Check,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 
 const BRANCH_OPTIONS = ['City Mall', 'BYD 6A', 'BYD 60M'];
@@ -76,6 +77,36 @@ const StaffPortal = () => {
   const [editingBranch, setEditingBranch] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState(user?.branch || 'City Mall');
   const [branchSaving, setBranchSaving] = useState(false);
+
+  // Forced password change state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePwdLoading, setChangePwdLoading] = useState(false);
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (newPassword.length < 4) {
+      toast.error('Password must be at least 4 characters long');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setChangePwdLoading(true);
+    try {
+      await api.put('/api/portal/change-password', { password: newPassword });
+      toast.success('Password changed successfully! Welcome to your portal.');
+      
+      // Update the user state locally so is_first_login is false
+      setUser(prev => ({ ...prev, is_first_login: false }));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to change password');
+    } finally {
+      setChangePwdLoading(false);
+    }
+  };
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -167,6 +198,52 @@ const StaffPortal = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+      {/* Forced Password Change Modal */}
+      {user?.is_first_login && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+          <div className="relative w-full max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 p-8 flex flex-col items-center text-center motion-preset-fade motion-duration-300">
+            <div className="p-4 bg-primary-500 rounded-2xl text-white shadow-lg shadow-primary-500/30 mb-4 animate-bounce">
+              <Lock size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Change Your Password</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              For security reasons, you must change your default password upon first login.
+            </p>
+            <form onSubmit={handleChangePassword} className="w-full text-left space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">New Password</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Confirm New Password</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={changePwdLoading}
+                className="w-full mt-2 py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {changePwdLoading ? 'Updating Password...' : 'Save New Password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">

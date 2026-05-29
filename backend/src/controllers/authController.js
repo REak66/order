@@ -45,18 +45,27 @@ exports.login = asyncHandler(async (req, res) => {
     });
 });
 
-// Staff login — identified by phone number
+// Staff login — identified by username and password
 exports.staffLogin = asyncHandler(async (req, res) => {
-    const { phone_number } = req.body;
+    const { username, password } = req.body;
 
-    if (!phone_number) {
-        return res.status(400).json({ message: 'Phone number is required' });
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    const staff = await User.findOne({ phone_number: phone_number.trim() });
+    const staff = await User.findOne({ username: new RegExp(`^${username.trim()}$`, 'i') });
 
     if (!staff) {
-        return res.status(401).json({ message: 'Phone number not found. Please register first.' });
+        return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    if (!staff.password) {
+        return res.status(401).json({ message: 'Your account does not have a password configured. Please contact your admin.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, staff.password);
+    if (!isMatch) {
+        return res.status(401).json({ message: 'Invalid username or password' });
     }
 
     const token = jwt.sign(
@@ -72,7 +81,9 @@ exports.staffLogin = asyncHandler(async (req, res) => {
             full_name: staff.full_name,
             branch: staff.branch,
             phone_number: staff.phone_number,
-            role: 'staff'
+            username: staff.username,
+            role: 'staff',
+            is_first_login: staff.is_first_login
         }
     });
 });

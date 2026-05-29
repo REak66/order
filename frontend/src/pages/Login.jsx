@@ -10,7 +10,8 @@ const Login = ({ isAdminMode = false }) => {
   const [password, setPassword] = useState('');
 
   // Staff login form
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [staffUsername, setStaffUsername] = useState('');
+  const [staffPassword, setStaffPassword] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, staffLogin } = useAuth();
@@ -34,7 +35,7 @@ const Login = ({ isAdminMode = false }) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await staffLogin(phoneNumber.trim());
+      await staffLogin(staffUsername.trim(), staffPassword);
       toast.success('Welcome! Redirecting to your portal...');
       navigate('/staff-portal');
     } catch (err) {
@@ -76,16 +77,31 @@ const Login = ({ isAdminMode = false }) => {
               <form onSubmit={handleStaffLogin} className="space-y-5 motion-preset-fade motion-duration-200">
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Phone Number
+                    Username
                   </label>
                   <input
-                    id="staff-phone"
-                    type="tel"
+                    id="staff-username"
+                    type="text"
                     required
                     className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950/50 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-slate-800 dark:text-slate-200 shadow-sm focus:scale-[1.01]"
-                    placeholder="e.g. 0xx-xxx-xxxx"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="Enter your username"
+                    value={staffUsername}
+                    onChange={(e) => setStaffUsername(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Password
+                  </label>
+                  <input
+                    id="staff-password"
+                    type="password"
+                    required
+                    className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950/50 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-slate-800 dark:text-slate-200 shadow-sm focus:scale-[1.01]"
+                    placeholder="••••••••"
+                    value={staffPassword}
+                    onChange={(e) => setStaffPassword(e.target.value)}
                   />
                 </div>
 

@@ -19,7 +19,8 @@ const {
     toOrderInputDate,
     getExpectedOrderIsoDate,
     isTomorrowOrderDate,
-    isTodayOrFutureOrderDate
+    isTodayOrFutureOrderDate,
+    getLunchDate
 } = require('../utils/dateUtils');
 require('dotenv').config();
 
@@ -202,8 +203,9 @@ const formatStaffName = (user) => {
 // ─── Report Builder ───────────────────────────────────────────────────────────
 
 const buildDailyReport = async (date = new Date()) => {
-    const lunchDate = getTomorrowDate(date);
-    const orderDate = toLocalIsoDate(lunchDate);
+    const orderDate = getLunchDate(date);
+    const [year, month, day] = orderDate.split('-');
+    const lunchDate = new Date(`${year}-${month}-${day}T00:00:00`);
     const displayDate = toDisplayDate(lunchDate);
     const users = await User.find({}).sort({ branch: 1, full_name: 1 });
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
@@ -235,8 +237,9 @@ const buildDailyReport = async (date = new Date()) => {
 };
 
 const buildDailySum = async (date = new Date()) => {
-    const lunchDate = getTomorrowDate(date);
-    const orderDate = toLocalIsoDate(lunchDate);
+    const orderDate = getLunchDate(date);
+    const [year, month, day] = orderDate.split('-');
+    const lunchDate = new Date(`${year}-${month}-${day}T00:00:00`);
     const displayDate = toDisplayDate(lunchDate);
     const users = await User.find({}).sort({ branch: 1, full_name: 1 });
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
@@ -384,9 +387,14 @@ const sendOrderReminderIfDue = async () => {
         const GROUP_ID = await getGroupId();
         if (!GROUP_ID) return;
 
+        const nextLunchDateStr = getLunchDate(new Date());
+        const [year, month, day] = nextLunchDateStr.split('-');
+        const nextLunchDate = new Date(`${year}-${month}-${day}T00:00:00`);
+        const displayDate = toDisplayDate(nextLunchDate);
+
         await runningBot.telegram.sendMessage(
             GROUP_ID,
-            `សូមអ្នកទាំងអស់គ្នាកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${getTomorrowDisplayDate()})។\n\nទម្រង់កម្មង់:\n- ឈ្មោះ : Full Name\n- សាខា : BYD6A\n- កម្មង់នៅថ្ងៃទី : ${toOrderInputDate(getTomorrowIsoDate())} ${SYMBOLS.ordered}`
+            `សូមអ្នកទាំងអស់គ្នាកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${displayDate})។\n\nទម្រង់កម្មង់:\n- ឈ្មោះ : Full Name\n- សាខា : BYD6A\n- កម្មង់នៅថ្ងៃទី : ${toOrderInputDate(nextLunchDateStr)} ${SYMBOLS.ordered}`
         );
         await setPersistentState('last_reminder_date', today);
     } catch (error) {

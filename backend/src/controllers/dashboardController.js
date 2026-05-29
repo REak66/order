@@ -1,10 +1,10 @@
 const User = require('../models/User');
 const Order = require('../models/Order');
 const asyncHandler = require('../utils/asyncHandler');
-const { getTomorrowIsoDate } = require('../utils/dateUtils');
+const { getExpectedOrderIsoDate } = require('../utils/dateUtils');
 
 exports.getStats = asyncHandler(async (req, res) => {
-    const lunchDate = getTomorrowIsoDate();
+    const lunchDate = getExpectedOrderIsoDate();
     
     const totalStaff = await User.countDocuments();
     const orders = await Order.find({ order_date: lunchDate });

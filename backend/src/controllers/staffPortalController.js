@@ -3,6 +3,8 @@ const User = require('../models/User');
 const Setting = require('../models/Setting');
 const asyncHandler = require('../utils/asyncHandler');
 const bot = require('../services/botService');
+const bcrypt = require('bcryptjs');
+const { getLunchDate } = require('../utils/dateUtils');
 
 // Helper: get setting value by key
 const getSetting = async (key, defaultValue = '') => {
@@ -56,25 +58,6 @@ const isWithinOrderWindow = async () => {
     };
 };
 
-// Get today's next business day (for ordering tomorrow's lunch)
-const getLunchDate = () => {
-    const khTime = getCambodiaTimeComponents();
-    // Create Date object in local server timezone representing the Cambodia local date
-    const localDate = new Date(khTime.year, khTime.month - 1, khTime.day);
-
-    const next = new Date(localDate);
-    next.setDate(localDate.getDate() + 1);
-
-    // Skip weekends — find next Mon if Sat/Sun
-    if (next.getDay() === 6) next.setDate(next.getDate() + 2); // Sat → Mon
-    if (next.getDay() === 0) next.setDate(next.getDate() + 1); // Sun → Mon
-
-    const yyyy = next.getFullYear();
-    const mm = String(next.getMonth() + 1).padStart(2, '0');
-    const dd = String(next.getDate()).padStart(2, '0');
-
-    return `${yyyy}-${mm}-${dd}`;
-};
 
 // GET /api/portal/my-order
 exports.getMyOrder = asyncHandler(async (req, res) => {
@@ -182,4 +165,26 @@ exports.updateBranch = asyncHandler(async (req, res) => {
     }
 
     res.json({ message: 'Branch updated', branch: staff.branch });
+});
+
+exports.changePassword = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const { password } = req.body;
+
+    if (!password || password.trim().length < 4) {
+        return res.status(400).json({ message: 'Password must be at least 4 characters long' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const staff = await User.findByIdAndUpdate(
+        userId,
+        { password: hashedPassword, is_first_login: false },
+        { new: true }
+    );
+
+    if (!staff) {
+        return res.status(404).json({ message: 'Staff user not found' });
+    }
+
+    res.json({ message: 'Password updated successfully' });
 });

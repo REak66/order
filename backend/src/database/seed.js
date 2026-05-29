@@ -64,22 +64,28 @@ const seedData = async () => {
         // 4. Seed Staff/Users
         console.log('Seeding staff users...');
         const mockUsers = [
-            { telegram_id: 111111, username: 'vireak_chao', full_name: 'Chao Vireak', branch: 'City Mall' },
-            { telegram_id: 222222, username: 'sokha_ly', full_name: 'Ly Sokha', branch: 'BYD 6A' },
-            { telegram_id: 333333, username: 'dara_chann', full_name: 'Chann Dara', branch: 'BYD 60M' },
-            { telegram_id: 444444, username: 'bopha_reach', full_name: 'Reach Bopha', branch: 'City Mall' },
-            { telegram_id: 555555, username: 'chantha_som', full_name: 'Som Chantha', branch: 'BYD 6A' },
-            { telegram_id: 666666, username: 'sothea_nguon', full_name: 'Nguon Sothea', branch: 'BYD 60M' },
-            { telegram_id: 777777, username: 'piseth_heng', full_name: 'Heng Piseth', branch: 'City Mall' },
-            { telegram_id: 888888, username: 'kalyan_sem', full_name: 'Sem Kalyan', branch: 'BYD 6A' },
-            { telegram_id: 999999, username: 'roth_lim', full_name: 'Lim Roth', branch: 'BYD 60M' },
-            { telegram_id: 101010, username: 'chetra_oun', full_name: 'Oun Chetra', branch: 'City Mall' },
-            { telegram_id: 202020, username: 'serey_vuth', full_name: 'Vuth Serey', branch: 'BYD 6A' },
-            { telegram_id: 303030, username: 'narith_kem', full_name: 'Kem Narith', branch: 'BYD 60M' },
-            { telegram_id: 404040, username: 'sophal_meas', full_name: 'Meas Sophal', branch: 'City Mall' },
-            { telegram_id: 505050, username: 'leakhena_te', full_name: 'Te Leakhena', branch: 'BYD 6A' },
-            { telegram_id: 606060, username: 'visal_seng', full_name: 'Seng Visal', branch: 'BYD 60M' }
+            { telegram_id: 111111, username: 'vireak_chao', full_name: 'Chao Vireak', branch: 'City Mall', phone_number: '099111111' },
+            { telegram_id: 222222, username: 'sokha_ly', full_name: 'Ly Sokha', branch: 'BYD 6A', phone_number: '099222222' },
+            { telegram_id: 333333, username: 'dara_chann', full_name: 'Chann Dara', branch: 'BYD 60M', phone_number: '099333333' },
+            { telegram_id: 444444, username: 'bopha_reach', full_name: 'Reach Bopha', branch: 'City Mall', phone_number: '099444444' },
+            { telegram_id: 555555, username: 'chantha_som', full_name: 'Som Chantha', branch: 'BYD 6A', phone_number: '099555555' },
+            { telegram_id: 666666, username: 'sothea_nguon', full_name: 'Nguon Sothea', branch: 'BYD 60M', phone_number: '099666666' },
+            { telegram_id: 777777, username: 'piseth_heng', full_name: 'Heng Piseth', branch: 'City Mall', phone_number: '099777777' },
+            { telegram_id: 888888, username: 'kalyan_sem', full_name: 'Sem Kalyan', branch: 'BYD 6A', phone_number: '099888888' },
+            { telegram_id: 999999, username: 'roth_lim', full_name: 'Lim Roth', branch: 'BYD 60M', phone_number: '099999999' },
+            { telegram_id: 101010, username: 'chetra_oun', full_name: 'Oun Chetra', branch: 'City Mall', phone_number: '099101010' },
+            { telegram_id: 202020, username: 'serey_vuth', full_name: 'Vuth Serey', branch: 'BYD 6A', phone_number: '099202020' },
+            { telegram_id: 303030, username: 'narith_kem', full_name: 'Kem Narith', branch: 'BYD 60M', phone_number: '099303030' },
+            { telegram_id: 404040, username: 'sophal_meas', full_name: 'Meas Sophal', branch: 'City Mall', phone_number: '099404040' },
+            { telegram_id: 505050, username: 'leakhena_te', full_name: 'Te Leakhena', branch: 'BYD 6A', phone_number: '099505050' },
+            { telegram_id: 606060, username: 'visal_seng', full_name: 'Seng Visal', branch: 'BYD 60M', phone_number: '099606060' }
         ];
+
+        // Hashing passwords to phone numbers dynamically for seeds and force change on login
+        for (const user of mockUsers) {
+            user.password = await bcrypt.hash(user.phone_number, 10);
+            user.is_first_login = true;
+        }
 
         const seededUsers = await User.insertMany(mockUsers);
         console.log(`${seededUsers.length} staff users seeded successfully.`);
