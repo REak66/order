@@ -3,12 +3,12 @@ const asyncHandler = require('../utils/asyncHandler');
 const bcrypt = require('bcryptjs');
 
 exports.getAllStaff = asyncHandler(async (req, res) => {
-    const staff = await User.find().sort({ created_at: -1 });
+    const staff = await User.find().sort({ created_at: -1 }).select('-telegram_id');
     res.json(staff);
 });
 
 exports.addStaff = asyncHandler(async (req, res) => {
-    const { telegram_id, username, full_name, branch, password } = req.body;
+    const { username, full_name, branch, password } = req.body;
 
     if (!username || !username.trim()) {
         return res.status(400).json({ message: 'Username is required' });
@@ -31,7 +31,6 @@ exports.addStaff = asyncHandler(async (req, res) => {
     }
 
     const staff = await User.create({
-        telegram_id,
         username: normalizedUsername,
         full_name,
         branch,
@@ -43,7 +42,7 @@ exports.addStaff = asyncHandler(async (req, res) => {
 
 exports.updateStaff = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { telegram_id, username, full_name, branch, password } = req.body;
+    const { username, full_name, branch, password } = req.body;
 
     if (!username || !username.trim()) {
         return res.status(400).json({ message: 'Username is required' });
@@ -65,10 +64,6 @@ exports.updateStaff = asyncHandler(async (req, res) => {
         full_name,
         branch
     };
-
-    if (telegram_id !== undefined) {
-        updateData.telegram_id = telegram_id;
-    }
 
     if (password && password.trim() !== '') {
         updateData.password = await bcrypt.hash(password, 10);
