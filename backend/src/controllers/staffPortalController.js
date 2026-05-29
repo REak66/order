@@ -10,16 +10,41 @@ const getSetting = async (key, defaultValue = '') => {
     return row?.value || defaultValue;
 };
 
+// Helper: get current time and date components in Cambodia (Asia/Phnom_Penh) timezone
+const getCambodiaTimeComponents = () => {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Phnom_Penh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).formatToParts(now);
+
+    const map = {};
+    parts.forEach(p => { map[p.type] = p.value; });
+
+    return {
+        year: Number(map.year),
+        month: Number(map.month),
+        day: Number(map.day),
+        hour: Number(map.hour),
+        minute: Number(map.minute)
+    };
+};
+
 // Helper: check if current time is within order window
 const isWithinOrderWindow = async () => {
     const startTime = await getSetting('order_start_time', '07:00');
     const endTime = await getSetting('order_end_time', '16:00');
 
-    const now = new Date();
+    const khTime = getCambodiaTimeComponents();
     const [startH, startM] = startTime.split(':').map(Number);
     const [endH, endM] = endTime.split(':').map(Number);
 
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = khTime.hour * 60 + khTime.minute;
     const startMinutes = startH * 60 + startM;
     const endMinutes = endH * 60 + endM;
 
@@ -27,19 +52,28 @@ const isWithinOrderWindow = async () => {
         allowed: currentMinutes >= startMinutes && currentMinutes <= endMinutes,
         startTime,
         endTime,
-        currentTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+        currentTime: `${String(khTime.hour).padStart(2, '0')}:${String(khTime.minute).padStart(2, '0')}`
     };
 };
 
 // Get today's next business day (for ordering tomorrow's lunch)
 const getLunchDate = () => {
-    const now = new Date();
-    const next = new Date(now);
-    next.setDate(now.getDate() + 1);
+    const khTime = getCambodiaTimeComponents();
+    // Create Date object in local server timezone representing the Cambodia local date
+    const localDate = new Date(khTime.year, khTime.month - 1, khTime.day);
+
+    const next = new Date(localDate);
+    next.setDate(localDate.getDate() + 1);
+
     // Skip weekends — find next Mon if Sat/Sun
     if (next.getDay() === 6) next.setDate(next.getDate() + 2); // Sat → Mon
     if (next.getDay() === 0) next.setDate(next.getDate() + 1); // Sun → Mon
-    return next.toISOString().split('T')[0];
+
+    const yyyy = next.getFullYear();
+    const mm = String(next.getMonth() + 1).padStart(2, '0');
+    const dd = String(next.getDate()).padStart(2, '0');
+
+    return `${yyyy}-${mm}-${dd}`;
 };
 
 // GET /api/portal/my-order
