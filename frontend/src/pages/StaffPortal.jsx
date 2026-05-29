@@ -51,6 +51,18 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// Helper: check if current local time is within start–end window
+const isTimeWithinWindow = (startTime, endTime) => {
+  if (!startTime || !endTime) return true; // fallback: assume open if no window info
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const [startH, startM] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+};
+
 const LiveClock = () => {
   const [time, setTime] = useState(new Date());
   useEffect(() => {
@@ -185,7 +197,19 @@ const StaffPortal = () => {
   };
 
   const win = orderData?.window;
-  const isWithinWindow = win?.allowed;
+  // Real-time client-side check so status updates immediately when clock crosses boundary
+  const [liveWithinWindow, setLiveWithinWindow] = useState(win?.allowed ?? false);
+  useEffect(() => {
+    if (!win) return;
+    // Update immediately
+    setLiveWithinWindow(isTimeWithinWindow(win.startTime, win.endTime));
+    // Check every second to stay in sync with the live clock
+    const timer = setInterval(() => {
+      setLiveWithinWindow(isTimeWithinWindow(win.startTime, win.endTime));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [win?.startTime, win?.endTime]);
+  const isWithinWindow = liveWithinWindow;
   const orderStatus = orderData?.status || 'not_ordered';
   const lunchDate = orderData?.order_date;
 
