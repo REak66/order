@@ -6,7 +6,6 @@ const UserSchema = new mongoose.Schema({
     password: { type: String },
     is_first_login: { type: Boolean, default: true },
     full_name: { type: String, required: true },
-    phone_number: { type: String, unique: true, sparse: true },
     branch: { 
         type: String, 
         enum: ['City Mall', 'BYD 6A', 'BYD 60M'],

@@ -11,7 +11,6 @@ import {
   AlertCircle,
   LogOut,
   MapPin,
-  Phone,
   RefreshCw,
   Loader2,
   CalendarDays,
@@ -324,13 +323,6 @@ const StaffPortal = () => {
                 </div>
               )}
 
-              {/* Phone */}
-              {user?.phone_number && (
-                <div className="flex items-center gap-1.5 bg-white/15 rounded-xl px-3 py-1.5 text-sm font-medium">
-                  <Phone size={14} />
-                  {user.phone_number}
-                </div>
-              )}
             </div>
           </div>
 

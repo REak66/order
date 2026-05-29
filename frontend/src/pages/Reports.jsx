@@ -5,7 +5,8 @@ import {
   CalendarRange,
   Calendar,
   Building,
-  Search
+  Search,
+  Utensils
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { addDays, endOfWeek, format, startOfWeek, parseISO } from 'date-fns';
@@ -18,6 +19,13 @@ const branchOptions = [
   { value: 'City Mall', label: 'City Mall' },
   { value: 'BYD 6A', label: 'BYD 6A' },
   { value: 'BYD 60M', label: 'BYD 60M' }
+];
+
+const statusOptions = [
+  { value: '', label: 'All Statuses' },
+  { value: 'ordered', label: 'Ordered' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'not_ordered', label: 'Not Ordered' }
 ];
 
 const periodOptions = [
@@ -58,10 +66,12 @@ const Reports = () => {
     month: tomorrowMonth,
     startDate: tomorrowIso,
     endDate: tomorrowIso,
-    branch: ''
+    branch: '',
+    status: ''
   });
   const isMonthlyReport = filters.period === 'monthly';
   const isSummaryReport = filters.period === 'weekly';
+  const isDetailedReport = !isSummaryReport && !isMonthlyReport;
   const selectedMonth = filters.month || tomorrowMonth;
   const monthlyBaseDate = new Date(`${selectedMonth}-01T00:00:00`);
   const daysInMonth = new Date(monthlyBaseDate.getFullYear(), monthlyBaseDate.getMonth() + 1, 0).getDate();
@@ -166,14 +176,14 @@ const Reports = () => {
         <div className="flex gap-2">
           <button
             onClick={() => handleExport('excel')}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl transition"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl transition cursor-pointer font-semibold shadow-md shadow-green-600/10 hover:scale-[1.02] active:scale-[0.98]"
           >
             <Download size={18} />
             <span className="hidden sm:inline">Excel</span>
           </button>
           <button
             onClick={() => handleExport('pdf')}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl transition"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl transition cursor-pointer font-semibold shadow-md shadow-red-600/10 hover:scale-[1.02] active:scale-[0.98]"
           >
             <Download size={18} />
             <span className="hidden sm:inline">PDF</span>
@@ -181,8 +191,8 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-wrap gap-4 items-end">
-        <div className="space-y-1">
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 items-end">
+        <div className="space-y-1 w-full">
           <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
             <CalendarRange size={12} />
             Range
@@ -193,10 +203,10 @@ const Reports = () => {
             onChange={(e) => updatePeriod(e.target.value)}
             placeholder="Select Range"
             hasSearch={false}
-            className="min-w-[150px]"
+            className="w-full"
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 w-full">
           <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
             <Calendar size={12} />
             {isMonthlyReport ? 'Month' : filters.period === 'daily' ? 'Order Date' : 'Base Date'}
@@ -204,7 +214,7 @@ const Reports = () => {
           {isMonthlyReport ? (
             <input
               type="month"
-              className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition text-sm font-medium text-slate-700 dark:text-slate-200"
+              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition text-sm font-medium text-slate-700 dark:text-slate-200"
               value={filters.month}
               onChange={(e) => updateMonth(e.target.value)}
             />
@@ -212,31 +222,31 @@ const Reports = () => {
             <SelectDate
               value={filters.date}
               onChange={(e) => updateDate(e.target.value)}
-              className="w-[180px]"
+              className="w-full"
             />
           )}
         </div>
         {filters.period === 'custom' && (
           <>
-            <div className="space-y-1">
+            <div className="space-y-1 w-full">
               <label className="text-xs font-semibold text-slate-500 uppercase">Start Date</label>
               <SelectDate
                 value={filters.startDate}
                 onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                className="w-[180px]"
+                className="w-full"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 w-full">
               <label className="text-xs font-semibold text-slate-500 uppercase">End Date</label>
               <SelectDate
                 value={filters.endDate}
                 onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                className="w-[180px]"
+                className="w-full"
               />
             </div>
           </>
         )}
-        <div className="space-y-1">
+        <div className="space-y-1 w-full">
           <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
             <Building size={12} />
             Branch
@@ -247,11 +257,27 @@ const Reports = () => {
             onChange={(e) => setFilters({ ...filters, branch: e.target.value })}
             placeholder="All Branches"
             hasSearch={true}
-            className="min-w-[150px]"
+            className="w-full"
           />
         </div>
+        {isDetailedReport && (
+          <div className="space-y-1 w-full">
+            <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+              <Utensils size={12} />
+              Status
+            </label>
+            <SearchSelect
+              options={statusOptions}
+              value={filters.status}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              placeholder="All Statuses"
+              hasSearch={false}
+              className="w-full"
+            />
+          </div>
+        )}
         {!isSummaryReport && (
-          <div className="space-y-1 min-w-[240px] flex-1">
+          <div className="space-y-1 w-full sm:col-span-2 lg:col-span-1">
             <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
               <Search size={12} />
               Search Staff
@@ -272,13 +298,21 @@ const Reports = () => {
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
         {isMonthlyReport && (
-          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-center">
-            <h3 className="font-bold text-lg text-slate-800 dark:text-white">
-              Report For {format(monthlyBaseDate, 'MMMM-yyyy')} ({filters.branch || 'All Branches'})
-            </h3>
-          </div>
+          <>
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-center shrink-0">
+              <h3 className="font-bold text-lg text-slate-800 dark:text-white">
+                Report For {format(monthlyBaseDate, 'MMMM-yyyy')} ({filters.branch || 'All Branches'})
+              </h3>
+            </div>
+            {/* Horizontal Swipe Tip Banner for Monthly Sheet on Mobile */}
+            <div className="md:hidden bg-primary-50 dark:bg-primary-950/20 px-4 py-2.5 text-center border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-primary-600 dark:text-primary-400 flex items-center justify-center gap-1.5 animate-pulse shrink-0">
+              <span>💡 Tip: Swipe horizontally on the calendar below to view all days</span>
+            </div>
+          </>
         )}
-        <div className="overflow-x-auto">
+
+        {/* ── Desktop View Table ── */}
+        <div className={cn("overflow-x-auto", !isMonthlyReport && "hidden md:block")}>
           <table className="w-full text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-sm uppercase tracking-wider">
               {isMonthlyReport ? (
@@ -312,7 +346,6 @@ const Reports = () => {
               )}
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-
                 {loading ? (
                   [1, 2, 3].map(i => (
                     <tr key={`loading-${i}`} className="animate-pulse">
@@ -398,6 +431,90 @@ const Reports = () => {
             </tbody>
           </table>
         </div>
+
+        {/* ── Mobile View Card List (Not for Monthly reports) ── */}
+        {!isMonthlyReport && (
+          <div className="block md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            {loading ? (
+              [1, 2, 3].map(i => (
+                <div key={`loading-card-${i}`} className="p-4 animate-pulse space-y-3">
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/4" />
+                </div>
+              ))
+            ) : displayedReports.length === 0 ? (
+              <div className="p-8 text-center text-slate-500">No records found for the selected criteria</div>
+            ) : (
+              displayedReports.map((report, index) => {
+                const cardKey = isSummaryReport 
+                  ? `card-sum-${report.order_date}-${report.branch}-${index}` 
+                  : `card-det-${report.user_id}-${report.order_date}-${index}`;
+
+                return isSummaryReport ? (
+                  /* Summary Card */
+                  <div key={cardKey} className="p-4 space-y-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-bold text-slate-800 dark:text-white text-base leading-snug">
+                          {report.order_date ? format(parseISO(report.order_date), 'MMM dd, yyyy') : '-'}
+                        </h4>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Summary Report</p>
+                      </div>
+                      <span className="px-2.5 py-1 bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0">
+                        {report.branch}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/60 text-xs">
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg">
+                        <span className="block text-slate-400 dark:text-slate-500 font-medium">Total Staff</span>
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300 font-mono">{report.total_staff}</span>
+                      </div>
+                      <div className="p-2 bg-green-50/50 dark:bg-green-950/10 rounded-lg">
+                        <span className="block text-green-600/70 dark:text-green-500/70 font-medium">Ordered</span>
+                        <span className="text-sm font-bold text-green-600 dark:text-green-400 font-mono">{report.ordered}</span>
+                      </div>
+                      <div className="p-2 bg-red-50/50 dark:bg-red-950/10 rounded-lg">
+                        <span className="block text-red-600/70 dark:text-red-500/70 font-medium">Cancelled</span>
+                        <span className="text-sm font-bold text-red-600 dark:text-red-400 font-mono">{report.cancelled}</span>
+                      </div>
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg">
+                        <span className="block text-slate-400 dark:text-slate-500 font-medium">Not Ordered</span>
+                        <span className="text-sm font-bold text-slate-500 dark:text-slate-400 font-mono">{report.not_ordered}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Detailed Card */
+                  <div key={cardKey} className="p-4 space-y-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <h4 className="font-bold text-slate-800 dark:text-white text-base leading-snug">{report.full_name}</h4>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                          {report.order_date ? format(parseISO(report.order_date), 'MMM dd, yyyy') : '-'}
+                        </p>
+                      </div>
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block shrink-0",
+                        report.status === 'ordered' && "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
+                        report.status === 'cancelled' && "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400",
+                        report.status === 'not_ordered' && "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                      )}>
+                        {report.status === 'not_ordered' ? 'Not Order' : report.status}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 pt-1">
+                      <span className="font-semibold text-slate-400 dark:text-slate-500">Branch:</span>
+                      <span className="font-medium">{report.branch}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

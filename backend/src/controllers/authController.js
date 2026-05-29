@@ -80,48 +80,9 @@ exports.staffLogin = asyncHandler(async (req, res) => {
             id: staff._id,
             full_name: staff.full_name,
             branch: staff.branch,
-            phone_number: staff.phone_number,
             username: staff.username,
             role: 'staff',
             is_first_login: staff.is_first_login
-        }
-    });
-});
-
-// Staff self-registration
-exports.staffRegister = asyncHandler(async (req, res) => {
-    const { full_name, branch, phone_number } = req.body;
-
-    if (!full_name || !branch || !phone_number) {
-        return res.status(400).json({ message: 'Full name, branch, and phone number are required' });
-    }
-
-    const existing = await User.findOne({ phone_number: phone_number.trim() });
-    if (existing) {
-        return res.status(409).json({ message: 'This phone number is already registered. Please sign in.' });
-    }
-
-    const staff = await User.create({
-        full_name: full_name.trim(),
-        branch,
-        phone_number: phone_number.trim(),
-        role: 'staff'
-    });
-
-    const token = jwt.sign(
-        { id: staff._id, role: 'staff', full_name: staff.full_name, branch: staff.branch },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRES_IN }
-    );
-
-    res.status(201).json({
-        token,
-        user: {
-            id: staff._id,
-            full_name: staff.full_name,
-            branch: staff.branch,
-            phone_number: staff.phone_number,
-            role: 'staff'
         }
     });
 });
@@ -143,3 +104,47 @@ exports.getStaffMe = asyncHandler(async (req, res) => {
     }
     res.json({ ...staff.toObject(), role: 'staff' });
 });
+// Get all admins
+exports.getAdmins = asyncHandler(async (req, res) => {
+    const admins = await Admin.find({}).select('username');
+    res.json(admins);
+});
+
+// Change admin or staff password
+exports.changePassword = asyncHandler(async (req, res) => {
+    const { targetUserId, targetType, newPassword } = req.body;
+
+    if (!newPassword) {
+        return res.status(400).json({ message: 'New password is required' });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+    }
+
+    // Resolve target account to update
+    const resolvedType = targetType || 'admin';
+    const resolvedUserId = targetUserId || req.admin.id;
+
+    if (resolvedType === 'admin') {
+        const targetAdmin = await Admin.findById(resolvedUserId);
+        if (!targetAdmin) {
+            return res.status(404).json({ message: 'Target Admin not found' });
+        }
+        targetAdmin.password = await bcrypt.hash(newPassword, 10);
+        await targetAdmin.save();
+    } else if (resolvedType === 'staff') {
+        const targetStaff = await User.findById(resolvedUserId);
+        if (!targetStaff) {
+            return res.status(404).json({ message: 'Target Staff not found' });
+        }
+        targetStaff.password = await bcrypt.hash(newPassword, 10);
+        targetStaff.is_first_login = true; // prompt them to change it on their next login if reset
+        await targetStaff.save();
+    } else {
+        return res.status(400).json({ message: 'Invalid target type' });
+    }
+
+    res.json({ message: 'Password updated successfully' });
+});
+

@@ -16,7 +16,7 @@ const {
 const { STATUSES, SYMBOLS } = require('../utils/constants');
 const botService = require('../services/botService');
 
-const getReportData = async ({ date, startDate, endDate, period, branch, month }) => {
+const getReportData = async ({ date, startDate, endDate, period, branch, month, status }) => {
     const range = getDateRange({ date, startDate, endDate, period, month });
     const usersQuery = branch ? { branch } : {};
     const users = await User.find(usersQuery).sort({ branch: 1, full_name: 1 });
@@ -78,7 +78,7 @@ const getReportData = async ({ date, startDate, endDate, period, branch, month }
         }));
     }
 
-    return range.dates.flatMap(orderDate => users.map(user => {
+    let results = range.dates.flatMap(orderDate => users.map(user => {
         const order = orders.find(o => (
             o.user &&
             o.user._id.toString() === user._id.toString() &&
@@ -94,11 +94,17 @@ const getReportData = async ({ date, startDate, endDate, period, branch, month }
             status: order ? order.status : 'not_ordered'
         };
     }));
+
+    if (status) {
+        results = results.filter(r => r.status === status);
+    }
+
+    return results;
 };
 
 exports.getLunchReports = asyncHandler(async (req, res) => {
-    const { date, startDate, endDate, period, branch, month } = req.query;
-    const reportData = await getReportData({ date, startDate, endDate, period, branch, month });
+    const { date, startDate, endDate, period, branch, month, status } = req.query;
+    const reportData = await getReportData({ date, startDate, endDate, period, branch, month, status });
     res.json(reportData);
 });
 
@@ -182,10 +188,10 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
 });
 
 exports.exportExcel = asyncHandler(async (req, res) => {
-    const { date, startDate, endDate, period, branch, month, template } = req.query;
+    const { date, startDate, endDate, period, branch, month, template, status } = req.query;
     const exportPeriod = template === 'monthly' ? 'monthly' : period;
 
-    const reportData = await getReportData({ date, startDate, endDate, period: exportPeriod, branch, month });
+    const reportData = await getReportData({ date, startDate, endDate, period: exportPeriod, branch, month, status });
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Lunch Report');
     const isMonthlyReport = exportPeriod === 'monthly';
@@ -291,10 +297,10 @@ exports.exportExcel = asyncHandler(async (req, res) => {
 });
 
 exports.exportPDF = asyncHandler(async (req, res) => {
-    const { date, startDate, endDate, period, branch, month, template } = req.query;
+    const { date, startDate, endDate, period, branch, month, template, status } = req.query;
     const exportPeriod = template === 'monthly' ? 'monthly' : period;
 
-    const reportData = await getReportData({ date, startDate, endDate, period: exportPeriod, branch, month });
+    const reportData = await getReportData({ date, startDate, endDate, period: exportPeriod, branch, month, status });
     const filenameDate = exportPeriod === 'monthly' && month
         ? month
         : startDate && endDate ? `${startDate}-to-${endDate}` : (date || exportPeriod || 'today');
@@ -397,9 +403,10 @@ exports.exportPDF = asyncHandler(async (req, res) => {
         doc.setFontSize(10);
         doc.text(`Range: ${filenameDate}`, 14, 24);
         doc.text(`Branch: ${branch || 'All Branches'}`, 14, 30);
+        doc.text(`Status: ${status ? (status === 'not_ordered' ? 'Not Ordered' : status.charAt(0).toUpperCase() + status.slice(1)) : 'All Statuses'}`, 14, 36);
 
         doc.autoTable({
-            startY: 38,
+            startY: 44,
             head: [isSummaryReport
                 ? ['Order Date', 'Branch', 'Total Staff', 'Ordered', 'Cancelled', 'Not Ordered']
                 : ['Staff Name', 'Branch', 'Order Date', 'Status']

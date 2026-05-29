@@ -24,11 +24,9 @@ const StaffManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
   const [formData, setFormData] = useState({
-    telegram_id: '',
     username: '',
     full_name: '',
     branch: 'City Mall',
-    phone_number: '',
     password: ''
   });
 
@@ -80,11 +78,9 @@ const StaffManagement = () => {
   const handleEdit = (member) => {
     setEditingStaff(member);
     setFormData({
-      telegram_id: member.telegram_id || '',
       username: member.username || '',
       full_name: member.full_name || '',
       branch: member.branch || 'City Mall',
-      phone_number: member.phone_number || '',
       password: ''
     });
     setIsModalOpen(true);
@@ -93,19 +89,16 @@ const StaffManagement = () => {
   const resetForm = () => {
     setEditingStaff(null);
     setFormData({
-      telegram_id: '',
       username: '',
       full_name: '',
       branch: 'City Mall',
-      phone_number: '',
       password: ''
     });
   };
 
   const filteredStaff = staff.filter(s =>
     s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.telegram_id?.toString().includes(searchTerm)
+    s.username?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -117,7 +110,7 @@ const StaffManagement = () => {
         </div>
         <button
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition cursor-pointer font-semibold shadow-md shadow-primary-600/10 hover:scale-[1.02] active:scale-[0.98]"
         >
           <Plus size={20} />
           <span>Add Staff</span>
@@ -138,24 +131,22 @@ const StaffManagement = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop View Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-sm uppercase tracking-wider">
               <tr>
                 <th className="px-6 py-4 font-semibold">Full Name</th>
                 <th className="px-6 py-4 font-semibold">Username</th>
-                <th className="px-6 py-4 font-semibold">Phone</th>
-                <th className="px-6 py-4 font-semibold">Telegram ID</th>
                 <th className="px-6 py-4 font-semibold">Branch</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-
                 {loading ? (
                   [1, 2, 3].map(i => (
                     <tr key={`loading-${i}`} className="animate-pulse">
-                      <td colSpan="6" className="px-6 py-4"><div className="h-6 bg-slate-100 dark:bg-slate-800 rounded" /></td>
+                      <td colSpan="5" className="px-6 py-4"><div className="h-6 bg-slate-100 dark:bg-slate-800 rounded" /></td>
                     </tr>
                   ))
                 ) : filteredStaff.length === 0 ? (
@@ -163,7 +154,7 @@ const StaffManagement = () => {
                     key="empty"
                     className="motion-preset-fade motion-duration-200"
                   >
-                    <td colSpan="6" className="px-6 py-12 text-center text-slate-500">No staff found</td>
+                    <td colSpan="5" className="px-6 py-12 text-center text-slate-500">No staff found</td>
                   </tr>
                 ) : (
                   filteredStaff.map((member) => (
@@ -172,11 +163,7 @@ const StaffManagement = () => {
                       className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
                     >
                       <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{member.full_name}</td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">@{member.username}</td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-sm">
-                        {member.phone_number || <span className="text-slate-300 dark:text-slate-600">—</span>}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-sm">{member.telegram_id}</td>
+                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{member.username}</td>
                       <td className="px-6 py-4">
                         <span className="px-3 py-1 bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400 rounded-full text-xs font-semibold">
                           {member.branch}
@@ -202,6 +189,57 @@ const StaffManagement = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile View Card List */}
+        <div className="block md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+          {loading ? (
+            [1, 2, 3].map(i => (
+              <div key={`loading-card-${i}`} className="p-4 animate-pulse space-y-3">
+                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
+                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
+                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/4" />
+                <div className="h-9 bg-slate-200 dark:bg-slate-800 rounded w-full mt-2" />
+              </div>
+            ))
+          ) : filteredStaff.length === 0 ? (
+            <div className="p-8 text-center text-slate-500">No staff found</div>
+          ) : (
+            filteredStaff.map((member) => (
+              <div key={member._id || member.id} className="p-4 space-y-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                {/* Header: Name and username */}
+                <div className="flex justify-between items-start gap-2">
+                  <div>
+                    <h4 className="font-bold text-slate-800 dark:text-white text-base leading-snug">{member.full_name}</h4>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{member.username}</p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0">
+                    {member.branch}
+                  </span>
+                </div>
+
+                {/* Details deleted since phone is removed */}
+
+                {/* Card Actions */}
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                  <button
+                    onClick={() => handleEdit(member)}
+                    className="flex-1 py-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-xl border border-primary-100 dark:border-primary-900/30 inline-flex items-center justify-center gap-1.5 font-semibold text-xs transition min-h-[38px] cursor-pointer"
+                  >
+                    <Edit2 size={14} />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(member._id || member.id)}
+                    className="flex-1 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/20 inline-flex items-center justify-center gap-1.5 font-semibold text-xs transition min-h-[38px] cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Modal */}
@@ -215,18 +253,18 @@ const StaffManagement = () => {
 
           {/* Animated Modal Dialog */}
           <div
-            className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 motion-preset-fade motion-duration-200"
+            className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 motion-preset-fade motion-duration-200 max-h-[calc(100vh-40px)] flex flex-col"
           >
-              <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
                 <h3 className="text-xl font-bold text-slate-800 dark:text-white">
                   {editingStaff ? 'Edit Staff' : 'Add New Staff'}
                 </h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer">
                   <X size={24} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
                   <input
@@ -238,18 +276,7 @@ const StaffManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    required
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
-                    placeholder="e.g. 0xx-xxx-xxxx"
-                    value={formData.phone_number}
-                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Username (for Login / Telegram)</label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Username (for Login)</label>
                   <input
                     type="text"
                     required
@@ -258,19 +285,11 @@ const StaffManagement = () => {
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Telegram ID</label>
-                  <input
-                    type="number"
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
-                    value={formData.telegram_id}
-                    onChange={(e) => setFormData({ ...formData, telegram_id: e.target.value })}
-                  />
-                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Password <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
-                      {editingStaff ? '(leave blank to keep unchanged)' : '(leave blank to default to Phone Number)'}
+                      {editingStaff ? '(leave blank to keep unchanged)' : '(leave blank to default to 123456)'}
                     </span>
                   </label>
                   <input
@@ -293,17 +312,17 @@ const StaffManagement = () => {
                   />
                 </div>
 
-                <div className="pt-4 flex gap-3">
+                <div className="pt-4 flex gap-3 shrink-0">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="flex-1 py-2.5 text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                    className="flex-1 py-2.5 text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition shadow-lg shadow-primary-600/15"
+                    className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition shadow-lg shadow-primary-600/15 cursor-pointer"
                   >
                     {editingStaff ? 'Save Changes' : 'Add Staff'}
                   </button>

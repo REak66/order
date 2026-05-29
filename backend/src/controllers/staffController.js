@@ -8,7 +8,7 @@ exports.getAllStaff = asyncHandler(async (req, res) => {
 });
 
 exports.addStaff = asyncHandler(async (req, res) => {
-    const { telegram_id, username, full_name, branch, phone_number, password } = req.body;
+    const { telegram_id, username, full_name, branch, password } = req.body;
 
     if (!username || !username.trim()) {
         return res.status(400).json({ message: 'Username is required' });
@@ -25,10 +25,9 @@ exports.addStaff = asyncHandler(async (req, res) => {
     let hashedPassword;
     if (password && password.trim() !== '') {
         hashedPassword = await bcrypt.hash(password, 10);
-    } else if (phone_number && phone_number.trim() !== '') {
-        hashedPassword = await bcrypt.hash(phone_number.trim(), 10);
     } else {
-        return res.status(400).json({ message: 'Password or Phone Number is required to create a default password' });
+        // Default to '123456' if no password is provided
+        hashedPassword = await bcrypt.hash('123456', 10);
     }
 
     const staff = await User.create({
@@ -36,7 +35,6 @@ exports.addStaff = asyncHandler(async (req, res) => {
         username: normalizedUsername,
         full_name,
         branch,
-        phone_number,
         password: hashedPassword,
         is_first_login: true
     });
@@ -45,7 +43,7 @@ exports.addStaff = asyncHandler(async (req, res) => {
 
 exports.updateStaff = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { telegram_id, username, full_name, branch, phone_number, password } = req.body;
+    const { telegram_id, username, full_name, branch, password } = req.body;
 
     if (!username || !username.trim()) {
         return res.status(400).json({ message: 'Username is required' });
@@ -63,12 +61,14 @@ exports.updateStaff = asyncHandler(async (req, res) => {
     }
 
     const updateData = {
-        telegram_id,
         username: normalizedUsername,
         full_name,
-        branch,
-        phone_number
+        branch
     };
+
+    if (telegram_id !== undefined) {
+        updateData.telegram_id = telegram_id;
+    }
 
     if (password && password.trim() !== '') {
         updateData.password = await bcrypt.hash(password, 10);

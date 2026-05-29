@@ -66,18 +66,6 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
-  // Staff self-registration
-  const staffRegister = async (full_name, branch, phone_number) => {
-    const res = await api.post('/api/auth/staff-register', { full_name, branch, phone_number });
-    const { token, user } = res.data;
-    localStorage.setItem('token', token);
-    localStorage.setItem('role', 'staff');
-    setToken(token);
-    setRole('staff');
-    setUser(user);
-    return res.data;
-  };
-
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
@@ -100,7 +88,6 @@ export const AuthProvider = ({ children }) => {
       loading,
       login,
       staffLogin,
-      staffRegister,
       logout,
       isAuthenticated: !!(admin || user),
       isAdmin: role === 'admin',

@@ -3,9 +3,14 @@ import api from '../utils/api';
 import {
   Save,
   MessageSquare,
-  Clock
+  Clock,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
+import SearchSelect from '../components/SearchSelect';
+import TimePicker from '../components/TimePicker';
 
 const normalizeTimeValue = (value) => {
   if (!value) return '';
@@ -14,6 +19,7 @@ const normalizeTimeValue = (value) => {
 };
 
 const Settings = () => {
+  const { admin } = useAuth();
   const [settings, setSettings] = useState({
     bot_token: '',
     group_id: '',
@@ -23,10 +29,18 @@ const Settings = () => {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    targetUserKey: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [accounts, setAccounts] = useState([]);
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+    fetchAccounts();
+  }, [admin]);
 
   const fetchSettings = async () => {
     try {
@@ -45,6 +59,45 @@ const Settings = () => {
     }
   };
 
+  const fetchAccounts = async () => {
+    try {
+      const [adminsRes, staffRes] = await Promise.all([
+        api.get('/api/auth/admins'),
+        api.get('/api/staff')
+      ]);
+
+      const adminOpts = adminsRes.data.map(a => ({
+        value: `admin-${a._id || a.id}`,
+        label: `🔑 Admin: ${a.username}`,
+        rawId: a._id || a.id,
+        type: 'admin'
+      }));
+
+      const staffOpts = staffRes.data.map(s => ({
+        value: `staff-${s._id || s.id}`,
+        label: `👤 Staff: ${s.full_name} (${s.username || ''})`,
+        rawId: s._id || s.id,
+        type: 'staff'
+      }));
+
+      const combined = [...adminOpts, ...staffOpts];
+      setAccounts(combined);
+
+      if (admin) {
+        const currentAdminId = admin.id || admin._id;
+        const selfOpt = adminOpts.find(o => o.rawId === currentAdminId);
+        if (selfOpt) {
+          setPasswordForm(prev => ({
+            ...prev,
+            targetUserKey: selfOpt.value
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch accounts:', error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -55,6 +108,46 @@ const Settings = () => {
       toast.error('Failed to update settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast.error('All password fields are required');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters long');
+      return;
+    }
+
+    const selectedAcc = accounts.find(a => a.value === passwordForm.targetUserKey);
+    const targetUserId = selectedAcc ? selectedAcc.rawId : (admin?.id || admin?._id);
+    const targetType = selectedAcc ? selectedAcc.type : 'admin';
+
+    setChangingPassword(true);
+    try {
+      await api.post('/api/auth/change-password', {
+        targetUserId,
+        targetType,
+        newPassword: passwordForm.newPassword
+      });
+      toast.success('Password updated successfully');
+      setPasswordForm(prev => ({
+        ...prev,
+        newPassword: '',
+        confirmPassword: ''
+      }));
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Failed to update password';
+      toast.error(msg);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -120,33 +213,21 @@ const Settings = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order Start Time</label>
-                <input
-                  type="time"
-                  step="60"
-                  required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
+                <TimePicker
                   value={settings.order_start_time}
                   onChange={(e) => setSettings({ ...settings, order_start_time: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order End Time</label>
-                <input
-                  type="time"
-                  step="60"
-                  required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
+                <TimePicker
                   value={settings.order_end_time}
                   onChange={(e) => setSettings({ ...settings, order_end_time: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Report Send Time</label>
-                <input
-                  type="time"
-                  step="60"
-                  required
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition text-slate-800 dark:text-slate-200"
+                <TimePicker
                   value={settings.report_time}
                   onChange={(e) => setSettings({ ...settings, report_time: e.target.value })}
                 />
@@ -165,6 +246,78 @@ const Settings = () => {
               <>
                 <Save size={20} />
                 <span>Save All Settings</span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+
+      {/* Reset User / Admin Password Card */}
+      <form
+        onSubmit={handlePasswordSubmit}
+        className="space-y-6 motion-preset-fade motion-duration-200 pt-4"
+      >
+        <div
+          className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
+        >
+          <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+            <Lock className="text-rose-500" size={20} />
+            <h3 className="font-bold text-slate-800 dark:text-white">Reset User / Admin Password</h3>
+          </div>
+          <div className="p-6 space-y-6">
+            {/* User Select Row */}
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Select User Account</label>
+                <SearchSelect
+                  options={accounts}
+                  value={passwordForm.targetUserKey}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, targetUserKey: e.target.value })}
+                  placeholder="Select Admin or Staff user..."
+                  hasSearch={true}
+                  className="w-full font-semibold"
+                />
+              </div>
+            </div>
+
+            {/* Passwords Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">New Password</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition text-slate-800 dark:text-slate-200"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Confirm New Password</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition text-slate-800 dark:text-slate-200"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={changingPassword}
+            className="flex items-center gap-2 px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-rose-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
+          >
+            {changingPassword ? 'Resetting...' : (
+              <>
+                <KeyRound size={20} />
+                <span>Reset User Password</span>
               </>
             )}
           </button>
