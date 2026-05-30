@@ -50,7 +50,7 @@ const StaffRoute = ({ children }) => {
 
 function AppRoutes() {
   const location = useLocation();
-  const { isAuthenticated, isAdmin, isStaff, loading } = useAuth();
+  const { isAuthenticated, isAdmin, loading } = useAuth();
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -11,15 +11,12 @@ const {
 const {
     TIME_ZONE,
     toLocalIsoDate,
-    getTomorrowDate,
     getTomorrowIsoDate,
     toDisplayDate,
-    getTomorrowDisplayDate,
     parseOrderDate,
     toOrderInputDate,
     getExpectedOrderIsoDate,
     isTomorrowOrderDate,
-    isTodayOrFutureOrderDate,
     getLunchDate
 } = require('../utils/dateUtils');
 require('dotenv').config();
@@ -132,9 +129,6 @@ const isCurrentSettingTime = async (settingKey) => {
     return getLocalMinutes() === settingMinutes;
 };
 
-const isCurrentReportTime = async () => {
-    return isCurrentSettingTime('report_time');
-};
 
 const isTimeInRange = (currentMinutes, startMinutes, endMinutes) => {
     if (startMinutes === endMinutes) return true;
@@ -151,6 +145,71 @@ const isOrderingAllowed = async (date = new Date()) => {
     if (startMinutes === null || endMinutes === null) return false;
 
     return isTimeInRange(getLocalMinutes(date), startMinutes, endMinutes);
+};
+
+const getBranchSettingValue = async (branchName, key) => {
+    const normalizedBranchKey = branchName.toLowerCase().replace(/\s+/g, '_');
+    const customEnabled = await getSettingValue(`branch_enabled_${normalizedBranchKey}`);
+    if (customEnabled === 'true') {
+        const val = await Setting.findOne({ key: `branch_${key}_${normalizedBranchKey}` });
+        if (val && val.value !== undefined && val.value !== null && val.value.trim() !== '') {
+            return val.value.trim();
+        }
+    }
+    return getSettingValue(key);
+};
+
+const getBranchGroupId = async (branchName) => {
+    const normalizedBranchKey = branchName.toLowerCase().replace(/\s+/g, '_');
+    const customEnabled = await getSettingValue(`branch_enabled_${normalizedBranchKey}`);
+    if (customEnabled === 'true') {
+        const dbGroupId = await Setting.findOne({ key: `branch_group_id_${normalizedBranchKey}` });
+        if (dbGroupId && dbGroupId.value && isValidGroupId(dbGroupId.value)) {
+            return dbGroupId.value.trim();
+        }
+    }
+    return null;
+};
+
+const isBranchOrderingAllowed = async (branchName, date = new Date()) => {
+    const startTimeStr = await getBranchSettingValue(branchName, 'order_start_time');
+    const endTimeStr = await getBranchSettingValue(branchName, 'order_end_time');
+
+    const startMinutes = parseTimeToMinutes(startTimeStr);
+    const endMinutes = parseTimeToMinutes(endTimeStr);
+
+    if (startMinutes === null || endMinutes === null) return false;
+
+    return isTimeInRange(getLocalMinutes(date), startMinutes, endMinutes);
+};
+
+const buildDailyReportForBranch = async (branchName, date = new Date()) => {
+    const orderDate = getLunchDate(date);
+    const [year, month, day] = orderDate.split('-');
+    const lunchDate = new Date(`${year}-${month}-${day}T00:00:00`);
+    const displayDate = toDisplayDate(lunchDate);
+    const users = await User.find({ branch: branchName }).sort({ full_name: 1 });
+    const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
+    const branch = BRANCHES.find(b => b.name === branchName) || { name: branchName, reportLabel: branchName };
+
+    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
+    report += `📍 ${branch.reportLabel}\n\n`;
+
+    const orderedUsers = users.filter(user => (
+        orders.some(order => order.user.toString() === user._id.toString())
+    ));
+
+    if (orderedUsers.length === 0) {
+        report += 'មិនមានអ្នកកម្មង់\n\n';
+    } else {
+        report += orderedUsers
+            .map((user, index) => `${index + 1}. ${formatStaffName(user)}`)
+            .join('\n');
+        report += '\n\n';
+    }
+
+    report += 'ប្រសិនបើមិនឃើញឈ្មោះរបស់អ្នកសូមទាក់ទង់មកកាន់ @SreyNeang2701 និង @Thaivouchkim សូមអរគុណ!!!';
+    return report.trim();
 };
 
 // ─── Message Helpers ──────────────────────────────────────────────────────────
@@ -174,9 +233,6 @@ const getAlreadyDoneAlert = (ctx) => {
     return `${getTelegramMention(ctx)} អ្នកបានធ្វើរួចហើយ។ ⚠️`;
 };
 
-const getPastCancelAlert = () => {
-    return 'អ្នកមិនអាចលុបការកម្មងកាលពីថ្ងៃមុនបានទេ!!!⚠️';
-};
 
 const replyToMessage = async (ctx, message) => {
     const messageId = ctx.message?.message_id;
@@ -196,8 +252,7 @@ const replyToMessage = async (ctx, message) => {
 };
 
 const formatStaffName = (user) => {
-    const username = user.username && user.username !== 'N/A' ? ` @${user.username.replace(/^@/, '')}` : '';
-    return `${user.full_name || 'មិនស្គាល់ឈ្មោះ'}${username}`;
+    return user.full_name || 'មិនស្គាល់ឈ្មោះ';
 };
 
 // ─── Report Builder ───────────────────────────────────────────────────────────
@@ -209,28 +264,27 @@ const buildDailyReport = async (date = new Date()) => {
     const displayDate = toDisplayDate(lunchDate);
     const users = await User.find({}).sort({ branch: 1, full_name: 1 });
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
+    
     let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
 
-    BRANCHES.forEach(branch => {
+    const branchReports = BRANCHES.map(branch => {
         const orderedUsers = users.filter(user => (
             user.branch === branch.name &&
             orders.some(order => order.user.toString() === user._id.toString())
         ));
 
-        report += `📍 ${branch.reportLabel}\n\n`;
-
+        let branchText = `📍 ${branch.reportLabel}\n\n`;
         if (orderedUsers.length === 0) {
-            report += 'មិនមានអ្នកកម្មង់\n';
+            branchText += 'មិនមានអ្នកកម្មង់';
         } else {
-            report += orderedUsers
+            branchText += orderedUsers
                 .map((user, index) => `${index + 1}. ${formatStaffName(user)}`)
                 .join('\n');
-            report += '\n';
         }
-
-        report += '\n';
+        return branchText;
     });
 
+    report += branchReports.join('\n\n') + '\n\n';
     report += 'ប្រសិនបើមិនឃើញឈ្មោះរបស់អ្នកសូមទាក់ទង់មកកាន់ @SreyNeang2701 និង @Thaivouchkim សូមអរគុណ!!!';
 
     return report.trim();
@@ -250,31 +304,26 @@ const buildDailySum = async (date = new Date()) => {
         orders.some(order => order.user.toString() === user._id.toString())
     ).length;
 
-    BRANCHES.forEach(branch => {
+    const branchReports = BRANCHES.map(branch => {
         const orderedUsers = users.filter(user => (
             user.branch === branch.name &&
             orders.some(order => order.user.toString() === user._id.toString())
         ));
 
         const count = orderedUsers.length;
+        let branchText = `📍 ${branch.reportLabel}: ${count} នាក់`;
 
-        report += `📍 ${branch.reportLabel}: ${count} នាក់\n\n`;
-
-        if (count === 0) {
-            if (totalSum === 0) {
-                report += 'មិនមានអ្នកកម្មង់\n';
-            }
-        } else {
-            report += orderedUsers
+        if (count > 0) {
+            branchText += '\n\n' + orderedUsers
                 .map((user, index) => `${index + 1}. ${formatStaffName(user)}`)
                 .join('\n');
-            report += '\n';
+        } else if (totalSum === 0) {
+            branchText += '\n\nមិនមានអ្នកកម្មង់';
         }
-
-        if (count > 0 || totalSum === 0) {
-            report += '\n';
-        }
+        return branchText;
     });
+
+    report += branchReports.join('\n\n') + '\n\n';
 
     if (totalSum > 0) {
         report += `សរុបចំនួនដែលបានកម្មង់: ${totalSum} នាក់\n\n`;
@@ -310,35 +359,74 @@ const syncGroupMuteState = async () => {
     const runningBot = await getRunningBot();
     if (!runningBot) return;
 
-    const groupId = await getGroupId();
-    if (!groupId) return;
-    if (!groupId.startsWith('-')) return;
+    // 1. Sync for branch-specific groups
+    for (const branch of BRANCHES) {
+        const branchGroupId = await getBranchGroupId(branch.name);
+        const mainGroupId = await getGroupId();
+        if (branchGroupId && branchGroupId !== mainGroupId) {
+            const orderingAllowed = await isBranchOrderingAllowed(branch.name);
+            const shouldMute = !orderingAllowed;
 
-    const orderingAllowed = await isOrderingAllowed();
-    const shouldMute = !orderingAllowed;
-    if (lastGroupMuteState === shouldMute) return;
+            const branchKey = branch.name.toLowerCase().replace(/\s+/g, '_');
+            const stateKey = `last_mute_state_${branchKey}`;
+            const lastMute = await getPersistentState(stateKey);
 
-    try {
-        await runningBot.telegram.setChatPermissions(groupId, shouldMute ? {
-            can_send_messages: false
-        } : {
-            can_send_messages: true,
-            can_send_audios: true,
-            can_send_documents: true,
-            can_send_photos: true,
-            can_send_videos: true,
-            can_send_video_notes: true,
-            can_send_voice_notes: true,
-            can_send_polls: true,
-            can_send_other_messages: true,
-            can_add_web_page_previews: true,
-            can_invite_users: true
-        });
+            if (lastMute === String(shouldMute)) continue;
 
-        lastGroupMuteState = shouldMute;
-        console.log(`Telegram group ${shouldMute ? 'muted' : 'unmuted'} based on order time settings.`);
-    } catch (error) {
-        console.error('Group mute sync error:', error.message);
+            try {
+                await runningBot.telegram.setChatPermissions(branchGroupId, shouldMute ? {
+                    can_send_messages: false
+                } : {
+                    can_send_messages: true,
+                    can_send_audios: true,
+                    can_send_documents: true,
+                    can_send_photos: true,
+                    can_send_videos: true,
+                    can_send_video_notes: true,
+                    can_send_voice_notes: true,
+                    can_send_polls: true,
+                    can_send_other_messages: true,
+                    can_add_web_page_previews: true,
+                    can_invite_users: true
+                });
+
+                await setPersistentState(stateKey, String(shouldMute));
+                console.log(`Telegram group for branch ${branch.name} (${branchGroupId}) ${shouldMute ? 'muted' : 'unmuted'} based on branch time settings.`);
+            } catch (error) {
+                console.error(`Group mute sync error for branch ${branch.name}:`, error.message);
+            }
+        }
+    }
+
+    // 2. Sync for main group
+    const mainGroupId = await getGroupId();
+    if (mainGroupId && mainGroupId.startsWith('-')) {
+        const orderingAllowed = await isOrderingAllowed();
+        const shouldMute = !orderingAllowed;
+        if (lastGroupMuteState !== shouldMute) {
+            try {
+                await runningBot.telegram.setChatPermissions(mainGroupId, shouldMute ? {
+                    can_send_messages: false
+                } : {
+                    can_send_messages: true,
+                    can_send_audios: true,
+                    can_send_documents: true,
+                    can_send_photos: true,
+                    can_send_videos: true,
+                    can_send_video_notes: true,
+                    can_send_voice_notes: true,
+                    can_send_polls: true,
+                    can_send_other_messages: true,
+                    can_add_web_page_previews: true,
+                    can_invite_users: true
+                });
+
+                lastGroupMuteState = shouldMute;
+                console.log(`Main Telegram group ${shouldMute ? 'muted' : 'unmuted'} based on main order time settings.`);
+            } catch (error) {
+                console.error('Main group mute sync error:', error.message);
+            }
+        }
     }
 };
 
@@ -360,45 +448,116 @@ const sendDailyReport = async () => {
 };
 
 const sendDailyReportIfDue = async () => {
-    if (!(await isCurrentReportTime())) return;
-
     const today = toLocalIsoDate();
-    const lastSent = await getPersistentState('last_report_date');
-    if (lastSent === today) return;
+    const runningBot = await getRunningBot();
+    if (!runningBot) return;
 
-    console.log('Running daily lunch report...');
-    const sent = await sendDailyReport();
-    if (sent) {
-        await setPersistentState('last_report_date', today);
+    // 1. Process for each branch
+    for (const branch of BRANCHES) {
+        const branchReportTime = await getBranchSettingValue(branch.name, 'report_time');
+        const settingMinutes = parseTimeToMinutes(branchReportTime);
+        if (settingMinutes !== null && getLocalMinutes() === settingMinutes) {
+            const branchKey = branch.name.toLowerCase().replace(/\s+/g, '_');
+            const stateKey = `last_report_date_${branchKey}`;
+            const lastSent = await getPersistentState(stateKey);
+            if (lastSent !== today) {
+                const branchGroupId = await getBranchGroupId(branch.name);
+                if (branchGroupId) {
+                    try {
+                        const report = await buildDailyReportForBranch(branch.name);
+                        await runningBot.telegram.sendMessage(branchGroupId, report);
+                        await setPersistentState(stateKey, today);
+                        console.log(`Sent daily report for branch ${branch.name} to group ${branchGroupId}`);
+                    } catch (error) {
+                        console.error(`Daily report error for branch ${branch.name}:`, error.message);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Process for main group
+    const mainReportTime = await getSettingValue('report_time');
+    const mainMinutes = parseTimeToMinutes(mainReportTime);
+    if (mainMinutes !== null && getLocalMinutes() === mainMinutes) {
+        const lastSent = await getPersistentState('last_report_date');
+        if (lastSent !== today) {
+            const mainGroupId = await getGroupId();
+            if (mainGroupId) {
+                try {
+                    const report = await buildDailyReport();
+                    await runningBot.telegram.sendMessage(mainGroupId, report);
+                    await setPersistentState('last_report_date', today);
+                    console.log(`Sent main daily report to group ${mainGroupId}`);
+                } catch (error) {
+                    console.error('Main daily report error:', error.message);
+                }
+            }
+        }
     }
 };
 
 const sendOrderReminderIfDue = async () => {
-    if (!(await isCurrentSettingTime('order_start_time'))) return;
-
+    const today = toLocalIsoDate();
     const runningBot = await getRunningBot();
     if (!runningBot) return;
 
-    const today = toLocalIsoDate();
-    const lastSent = await getPersistentState('last_reminder_date');
-    if (lastSent === today) return;
+    // 1. Process for each branch
+    for (const branch of BRANCHES) {
+        const branchStartTime = await getBranchSettingValue(branch.name, 'order_start_time');
+        const settingMinutes = parseTimeToMinutes(branchStartTime);
+        if (settingMinutes !== null && getLocalMinutes() === settingMinutes) {
+            const branchKey = branch.name.toLowerCase().replace(/\s+/g, '_');
+            const stateKey = `last_reminder_date_${branchKey}`;
+            const lastSent = await getPersistentState(stateKey);
+            if (lastSent !== today) {
+                const branchGroupId = await getBranchGroupId(branch.name);
+                if (branchGroupId) {
+                    const nextLunchDateStr = getLunchDate(new Date());
+                    const [year, month, day] = nextLunchDateStr.split('-');
+                    const nextLunchDate = new Date(`${year}-${month}-${day}T00:00:00`);
+                    const displayDate = toDisplayDate(nextLunchDate);
 
-    try {
-        const GROUP_ID = await getGroupId();
-        if (!GROUP_ID) return;
+                    try {
+                        await runningBot.telegram.sendMessage(
+                            branchGroupId,
+                            `សូមអ្នកទាំងអស់គ្នាកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${displayDate}) សម្រាប់សាខា ${branch.name}។\n\nទម្រង់កម្មង់:\n- ឈ្មោះ : Full Name\n- សាខា : ${branch.name.replace(/\s+/g, '')}\n- កម្មង់នៅថ្ងៃទី : ${toOrderInputDate(nextLunchDateStr)} ${SYMBOLS.ordered}`
+                        );
+                        await setPersistentState(stateKey, today);
+                        console.log(`Sent order reminder for branch ${branch.name} to group ${branchGroupId}`);
+                    } catch (error) {
+                        console.error(`Order reminder error for branch ${branch.name}:`, error.message);
+                    }
+                }
+            }
+        }
+    }
 
-        const nextLunchDateStr = getLunchDate(new Date());
-        const [year, month, day] = nextLunchDateStr.split('-');
-        const nextLunchDate = new Date(`${year}-${month}-${day}T00:00:00`);
-        const displayDate = toDisplayDate(nextLunchDate);
+    // 2. Process for main group
+    const mainStartTime = await getSettingValue('order_start_time');
+    const mainMinutes = parseTimeToMinutes(mainStartTime);
+    if (mainMinutes !== null && getLocalMinutes() === mainMinutes) {
+        const lastSent = await getPersistentState('last_reminder_date');
+        if (lastSent !== today) {
+            const mainGroupId = await getGroupId();
+            if (mainGroupId) {
+                const nextLunchDateStr = getLunchDate(new Date());
+                const [year, month, day] = nextLunchDateStr.split('-');
+                const nextLunchDate = new Date(`${year}-${month}-${day}T00:00:00`);
+                const displayDate = toDisplayDate(nextLunchDate);
 
-        await runningBot.telegram.sendMessage(
-            GROUP_ID,
-            `សូមអ្នកទាំងអស់គ្នាកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${displayDate})។\n\nទម្រង់កម្មង់:\n- ឈ្មោះ : Full Name\n- សាខា : BYD6A\n- កម្មង់នៅថ្ងៃទី : ${toOrderInputDate(nextLunchDateStr)} ${SYMBOLS.ordered}`
-        );
-        await setPersistentState('last_reminder_date', today);
-    } catch (error) {
-        console.error('Order reminder error:', error.message);
+                try {
+                    await runningBot.telegram.sendMessage(
+                        mainGroupId,
+                        `សូមអ្នកទាំងអស់គ្នាកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${displayDate})។\n\nទម្រង់កម្មង់:\n- ឈ្មោះ : Full Name\n- សាខា : BYD6A\n- កម្មង់នៅថ្ងៃទី : ${toOrderInputDate(nextLunchDateStr)} ${SYMBOLS.ordered}`
+                    );
+                    await setPersistentState('last_reminder_date', today);
+                    console.log(`Sent main order reminder to group ${mainGroupId}`);
+                } catch (error) {
+                    console.error('Main order reminder error:', error.message);
+                }
+            }
+        }
     }
 };
 
@@ -482,23 +641,23 @@ const registerHandlers = (telegramBot) => {
             return;
         }
 
-        if (!(await isOrderingAllowed())) {
-            return replyToMessage(ctx, getOrderClosedAlert(ctx));
-        }
-
         const match = orderMatch || cancelMatch;
         const name = match[1].trim();
         const brand = normalizeBranch(match[2]);
         const dateStr = match[3];
         const isOrder = !!orderMatch;
 
+        if (!isValidBranch(brand)) {
+            return replyToMessage(ctx, 'សាខាមិនត្រឹមត្រូវ។ សូមប្រើ City Mall, BYD6A, ឬ BYD60M។');
+        }
+
+        if (!(await isBranchOrderingAllowed(brand))) {
+            return replyToMessage(ctx, getOrderClosedAlert(ctx));
+        }
+
         try {
             const user = await User.findOne({ telegram_id: telegramId });
             if (!user) return replyToMessage(ctx, 'សូមចុច /start ដើម្បីចុះឈ្មោះជាមុនសិន។');
-
-            if (!isValidBranch(brand)) {
-                return replyToMessage(ctx, 'សាខាមិនត្រឹមត្រូវ។ សូមប្រើ City Mall, BYD6A, ឬ BYD60M។');
-            }
 
             const isoDate = parseOrderDate(dateStr);
 
@@ -544,7 +703,7 @@ const registerHandlers = (telegramBot) => {
                     { status: 'ordered' },
                     { upsert: true }
                 );
-                return replyToMessage(ctx, `បញ្ជាក់ការកម្មង់ ថ្ងៃទី : ${dateStr} ${SYMBOLS.confirm}`);
+                return;
             }
 
             await Order.findOneAndUpdate(
@@ -552,7 +711,7 @@ const registerHandlers = (telegramBot) => {
                 { status: 'cancelled' },
                 { upsert: true }
             );
-            return replyToMessage(ctx, `បានលុបការកម្មង់ ថ្ងៃទី : ${dateStr} ${SYMBOLS.blocked}`);
+            return;
         } catch (error) {
             console.error('Order/Cancel processing error:', error.message);
             return replyToMessage(ctx, 'មានបញ្ហាក្នុងការដំណើរការការកម្មង់របស់អ្នក។');
@@ -649,8 +808,8 @@ const sendOrderNotification = async (user, order) => {
     const runningBot = await getRunningBot();
     if (!runningBot) return false;
 
-    const groupId = await getGroupId();
-    if (!groupId) return false;
+    const mainGroupId = await getGroupId();
+    const branchGroupId = await getBranchGroupId(user.branch);
 
     try {
         const displayDate = toDisplayDate(new Date(order.order_date));
@@ -659,7 +818,12 @@ const sendOrderNotification = async (user, order) => {
             `🏢 *សាខា:* ${user.branch}\n` +
             `📅 *ថ្ងៃទី:* ${displayDate}`;
 
-        await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
+        if (branchGroupId) {
+            await runningBot.telegram.sendMessage(branchGroupId, message, { parse_mode: 'Markdown' });
+        }
+        if (mainGroupId && mainGroupId !== branchGroupId) {
+            await runningBot.telegram.sendMessage(mainGroupId, message, { parse_mode: 'Markdown' });
+        }
         return true;
     } catch (error) {
         console.error('Order notification error:', error.message);
@@ -671,8 +835,8 @@ const sendCancellationNotification = async (user, order) => {
     const runningBot = await getRunningBot();
     if (!runningBot) return false;
 
-    const groupId = await getGroupId();
-    if (!groupId) return false;
+    const mainGroupId = await getGroupId();
+    const branchGroupId = await getBranchGroupId(user.branch);
 
     try {
         const displayDate = toDisplayDate(new Date(order.order_date));
@@ -681,7 +845,12 @@ const sendCancellationNotification = async (user, order) => {
             `🏢 *សាខា:* ${user.branch}\n` +
             `📅 *ថ្ងៃទី:* ${displayDate}`;
 
-        await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
+        if (branchGroupId) {
+            await runningBot.telegram.sendMessage(branchGroupId, message, { parse_mode: 'Markdown' });
+        }
+        if (mainGroupId && mainGroupId !== branchGroupId) {
+            await runningBot.telegram.sendMessage(mainGroupId, message, { parse_mode: 'Markdown' });
+        }
         return true;
     } catch (error) {
         console.error('Cancellation notification error:', error.message);
@@ -693,8 +862,8 @@ const sendBranchUpdateNotification = async (user, order) => {
     const runningBot = await getRunningBot();
     if (!runningBot) return false;
 
-    const groupId = await getGroupId();
-    if (!groupId) return false;
+    const mainGroupId = await getGroupId();
+    const branchGroupId = await getBranchGroupId(user.branch);
 
     try {
         const displayDate = toDisplayDate(new Date(order.order_date));
@@ -703,7 +872,12 @@ const sendBranchUpdateNotification = async (user, order) => {
             `🏢 *សាខាថ្មី:* ${user.branch}\n` +
             `📅 *ថ្ងៃទី:* ${displayDate}`;
 
-        await runningBot.telegram.sendMessage(groupId, message, { parse_mode: 'Markdown' });
+        if (branchGroupId) {
+            await runningBot.telegram.sendMessage(branchGroupId, message, { parse_mode: 'Markdown' });
+        }
+        if (mainGroupId && mainGroupId !== branchGroupId) {
+            await runningBot.telegram.sendMessage(mainGroupId, message, { parse_mode: 'Markdown' });
+        }
         return true;
     } catch (error) {
         console.error('Branch update notification error:', error.message);
@@ -757,6 +931,10 @@ module.exports = {
     sendCancellationNotification,
     sendBranchUpdateNotification,
     sendOrderReminderIfDue,
-    sendDailyReportIfDue
+    sendDailyReportIfDue,
+    getBranchSettingValue,
+    getBranchGroupId,
+    isBranchOrderingAllowed,
+    buildDailyReportForBranch
 };
 

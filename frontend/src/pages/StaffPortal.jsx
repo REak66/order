@@ -382,7 +382,7 @@ const StaffPortal = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CalendarDays size={18} className="text-primary-500" />
-                  <h3 className="font-bold text-slate-800 dark:text-white">Tomorrow's Lunch</h3>
+                  <h3 className="font-bold text-slate-800 dark:text-white">{"Tomorrow's Lunch"}</h3>
                 </div>
                 <button
                   onClick={() => { setLoading(true); fetchOrder(); }}

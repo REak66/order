@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
-import { LogIn, ShieldCheck, User, ChevronRight } from 'lucide-react';
+import { LogIn, ShieldCheck, ChevronRight } from 'lucide-react';
 
 const Login = ({ isAdminMode = false }) => {
   // Admin form

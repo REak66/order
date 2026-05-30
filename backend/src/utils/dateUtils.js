@@ -62,14 +62,14 @@ const getLunchDate = (date = new Date()) => {
         month: '2-digit',
         day: '2-digit'
     }).formatToParts(date);
-    
+
     const map = {};
     parts.forEach(p => { map[p.type] = p.value; });
-    
+
     const year = Number(map.year);
     const month = Number(map.month);
     const day = Number(map.day);
-    
+
     const localDate = new Date(year, month - 1, day);
     const next = new Date(localDate);
     next.setDate(localDate.getDate() + 1);

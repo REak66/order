@@ -38,7 +38,7 @@ const seedData = async () => {
         // 2. Seed Default Settings (same as app.js logic)
         console.log('Seeding default settings...');
         const defaultSettings = [
-            { key: 'bot_token', value: process.env.BOT_TOKEN || 'placeholder_bot_token' },
+            { key: 'bot_token', value: process.env.BOT_TOKEN || '8702984374:AAH_LxuikY-P6VWDqe7rMPp1RggGih2Mh08' },
             { key: 'group_id', value: process.env.TELEGRAM_GROUP_ID || 'placeholder_group_id' },
             { key: 'order_start_time', value: '07:00' },
             { key: 'order_end_time', value: '16:00' },

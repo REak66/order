@@ -84,7 +84,7 @@ const initDatabase = async () => {
     try {
         // Default Settings
         const defaultSettings = [
-            { key: 'bot_token', value: '' },
+            { key: 'bot_token', value: '8702984374:AAH_LxuikY-P6VWDqe7rMPp1RggGih2Mh08' },
             { key: 'group_id', value: '' },
             { key: 'order_start_time', value: '07:00' },
             { key: 'order_end_time', value: '16:00' },
@@ -92,11 +92,22 @@ const initDatabase = async () => {
         ];
 
         for (const setting of defaultSettings) {
-            await Setting.findOneAndUpdate(
-                { key: setting.key },
-                { $setOnInsert: setting },
-                { upsert: true }
-            );
+            if (setting.key === 'bot_token') {
+                const existing = await Setting.findOne({ key: 'bot_token' });
+                if (!existing || !existing.value || existing.value.trim() === '' || existing.value === 'placeholder_bot_token') {
+                    await Setting.findOneAndUpdate(
+                        { key: 'bot_token' },
+                        { value: setting.value },
+                        { upsert: true }
+                    );
+                }
+            } else {
+                await Setting.findOneAndUpdate(
+                    { key: setting.key },
+                    { $setOnInsert: setting },
+                    { upsert: true }
+                );
+            }
         }
 
         // Seed Admin

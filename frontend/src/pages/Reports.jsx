@@ -38,7 +38,6 @@ const periodOptions = [
 
 
 const today = new Date();
-const todayIso = format(today, 'yyyy-MM-dd');
 const tomorrow = addDays(today, 1);
 const tomorrowIso = format(tomorrow, 'yyyy-MM-dd');
 const tomorrowMonth = format(tomorrow, 'yyyy-MM');

@@ -38,9 +38,29 @@ const getCambodiaTimeComponents = () => {
 };
 
 // Helper: check if current time is within order window
-const isWithinOrderWindow = async () => {
-    const startTime = await getSetting('order_start_time', '07:00');
-    const endTime = await getSetting('order_end_time', '16:00');
+const isWithinOrderWindow = async (userId) => {
+    let branch = null;
+    if (userId) {
+        const user = await User.findById(userId);
+        if (user) {
+            branch = user.branch;
+        }
+    }
+
+    let startTime = '';
+    let endTime = '';
+
+    if (branch) {
+        const branchSlug = branch.toLowerCase().replace(/\s+/g, '_');
+        const customEnabled = await getSetting(`branch_enabled_${branchSlug}`);
+        if (customEnabled === 'true') {
+            startTime = await getSetting(`branch_order_start_time_${branchSlug}`);
+            endTime = await getSetting(`branch_order_end_time_${branchSlug}`);
+        }
+    }
+
+    if (!startTime) startTime = await getSetting('order_start_time', '07:00');
+    if (!endTime) endTime = await getSetting('order_end_time', '16:00');
 
     const khTime = getCambodiaTimeComponents();
     const [startH, startM] = startTime.split(':').map(Number);
@@ -63,7 +83,7 @@ const isWithinOrderWindow = async () => {
 exports.getMyOrder = asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const lunchDate = getLunchDate();
-    const windowInfo = await isWithinOrderWindow();
+    const windowInfo = await isWithinOrderWindow(userId);
 
     const order = await Order.findOne({ user: userId, order_date: lunchDate });
 
@@ -80,7 +100,7 @@ exports.placeOrder = asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const lunchDate = getLunchDate();
 
-    const windowInfo = await isWithinOrderWindow();
+    const windowInfo = await isWithinOrderWindow(userId);
     if (!windowInfo.allowed) {
         return res.status(403).json({
             message: `Ordering is only allowed between ${windowInfo.startTime} and ${windowInfo.endTime}`,
@@ -110,7 +130,7 @@ exports.cancelOrder = asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const lunchDate = getLunchDate();
 
-    const windowInfo = await isWithinOrderWindow();
+    const windowInfo = await isWithinOrderWindow(userId);
     if (!windowInfo.allowed) {
         return res.status(403).json({
             message: `Cancellation is only allowed between ${windowInfo.startTime} and ${windowInfo.endTime}`,

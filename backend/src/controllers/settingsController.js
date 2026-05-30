@@ -45,49 +45,72 @@ exports.updateSettings = asyncHandler(async (req, res) => {
     const settings = { ...req.body };
     const shouldRestartBot = Object.prototype.hasOwnProperty.call(settings, 'bot_token');
 
-    for (const key of TIME_SETTING_KEYS) {
-        if (!Object.prototype.hasOwnProperty.call(settings, key)) continue;
-
-        const normalizedTime = normalizeTimeValue(settings[key]);
-        if (!normalizedTime) {
-            return res.status(400).json({ message: `${key} must be a valid HH:mm time` });
+    // Dynamically validate global and branch-specific times and group IDs
+    for (const [key, value] of Object.entries(settings)) {
+        if (key.includes('order_start_time') || key.includes('order_end_time') || key.includes('report_time')) {
+            if (value !== undefined && value !== null && value !== '') {
+                const normalizedTime = normalizeTimeValue(value);
+                if (!normalizedTime) {
+                    return res.status(400).json({ message: `${key} must be a valid HH:mm time` });
+                }
+                settings[key] = normalizedTime;
+            }
         }
-
-        settings[key] = normalizedTime;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(settings, 'group_id')) {
-        const normalizedGroupId = normalizeGroupId(settings.group_id);
-        if (normalizedGroupId === null) {
-            return res.status(400).json({ message: 'Group ID must be numeric' });
+        
+        if (key.includes('group_id')) {
+            if (value !== undefined && value !== null && value !== '') {
+                const normalizedGroupId = normalizeGroupId(value);
+                if (normalizedGroupId === null) {
+                    return res.status(400).json({ message: `${key} must be numeric` });
+                }
+                settings[key] = normalizedGroupId;
+            }
         }
-
-        settings.group_id = normalizedGroupId;
     }
 
     // Fetch existing settings to detect changes in times
-    const existingSettings = await Setting.find({ key: { $in: ['report_time', 'order_start_time'] } });
-    const oldReportTime = existingSettings.find(s => s.key === 'report_time')?.value || '';
-    const oldOrderStartTime = existingSettings.find(s => s.key === 'order_start_time')?.value || '';
+    const existingSettings = await Setting.find();
 
     for (const [key, value] of Object.entries(settings)) {
         await Setting.findOneAndUpdate(
             { key },
-            { value, updated_at: Date.now() },
+            { value: value !== undefined && value !== null ? String(value) : '', updated_at: Date.now() },
             { upsert: true }
         );
     }
 
     // If report_time was changed, clear last_report_date to allow immediate testing/triggering
+    const oldReportTime = existingSettings.find(s => s.key === 'report_time')?.value || '';
     if (settings.report_time && settings.report_time !== oldReportTime) {
         await Setting.deleteOne({ key: 'last_report_date' });
         console.log(`Cleared last_report_date because report_time changed from ${oldReportTime} to ${settings.report_time}`);
     }
 
     // If order_start_time was changed, clear last_reminder_date
+    const oldOrderStartTime = existingSettings.find(s => s.key === 'order_start_time')?.value || '';
     if (settings.order_start_time && settings.order_start_time !== oldOrderStartTime) {
         await Setting.deleteOne({ key: 'last_reminder_date' });
         console.log(`Cleared last_reminder_date because order_start_time changed from ${oldOrderStartTime} to ${settings.order_start_time}`);
+    }
+
+    // Handle branch-specific changes to clear report/reminder dates
+    for (const [key, value] of Object.entries(settings)) {
+        if (key.startsWith('branch_report_time_')) {
+            const oldVal = existingSettings.find(s => s.key === key)?.value || '';
+            if (value && value !== oldVal) {
+                const branchSlug = key.replace('branch_report_time_', '');
+                await Setting.deleteOne({ key: `last_report_date_${branchSlug}` });
+                console.log(`Cleared last_report_date_${branchSlug} because report_time changed to ${value}`);
+            }
+        }
+        if (key.startsWith('branch_order_start_time_')) {
+            const oldVal = existingSettings.find(s => s.key === key)?.value || '';
+            if (value && value !== oldVal) {
+                const branchSlug = key.replace('branch_order_start_time_', '');
+                await Setting.deleteOne({ key: `last_reminder_date_${branchSlug}` });
+                console.log(`Cleared last_reminder_date_${branchSlug} because order_start_time changed to ${value}`);
+            }
+        }
     }
 
     if (shouldRestartBot) {

@@ -155,7 +155,9 @@ const Dashboard = () => {
                     if (!isNaN(date.getTime())) {
                       return format(date, 'MMM dd');
                     }
-                  } catch (e) { }
+                  } catch (e) {
+                    // Fallback to raw value
+                  }
                   return value;
                 }}
               />

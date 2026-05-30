@@ -170,6 +170,9 @@ const StaffManagement = () => {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPosition, setSelectedPosition] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
   
@@ -454,14 +457,28 @@ const StaffManagement = () => {
     setNewDepartmentName('');
   };
 
-  const filteredStaff = staff.filter(s =>
-    s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.byd_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.hx_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.department?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredStaff = staff.filter(s => {
+    // 1. Text Search Filter
+    const matchesSearch = !searchTerm.trim() || (
+      s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.byd_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.hx_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.department?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    // 2. Position Select Filter
+    const matchesPosition = !selectedPosition || s.position === selectedPosition;
+    
+    // 3. Department Select Filter
+    const matchesDepartment = !selectedDepartment || s.department === selectedDepartment;
+    
+    // 4. Branch Select Filter
+    const matchesBranch = !selectedBranch || s.branch === selectedBranch;
+    
+    return matchesSearch && matchesPosition && matchesDepartment && matchesBranch;
+  });
 
   return (
     <div className="space-y-6">
@@ -494,16 +511,49 @@ const StaffManagement = () => {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-          <div className="relative w-full sm:max-w-md">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col xl:flex-row gap-4 items-stretch xl:items-center justify-between">
+          <div className="relative w-full xl:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
-              placeholder="Search staff, position, department, ID..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
+              placeholder="Search staff, ID, name..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200 text-sm font-semibold"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full xl:w-auto xl:min-w-[600px] shrink-0">
+            <div>
+              <SearchSelect
+                options={positions.map(p => ({ value: p, label: p }))}
+                value={selectedPosition}
+                onChange={(e) => setSelectedPosition(e.target.value)}
+                placeholder="All Positions"
+                hasSearch={true}
+                className="w-full font-semibold"
+              />
+            </div>
+            <div>
+              <SearchSelect
+                options={departments.map(d => ({ value: d, label: d }))}
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                placeholder="All Departments"
+                hasSearch={true}
+                className="w-full font-semibold"
+              />
+            </div>
+            <div>
+              <SearchSelect
+                options={branchOptions}
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                placeholder="All Branches"
+                hasSearch={false}
+                className="w-full font-semibold"
+              />
+            </div>
           </div>
         </div>
 

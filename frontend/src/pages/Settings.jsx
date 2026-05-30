@@ -36,6 +36,14 @@ const Settings = () => {
   });
   const [changingPassword, setChangingPassword] = useState(false);
   const [accounts, setAccounts] = useState([]);
+  const [activeTab, setActiveTab] = useState('global');
+
+  const tabs = [
+    { id: 'global', name: 'Global Settings' },
+    { id: 'byd_6a', name: 'BYD 6A' },
+    { id: 'city_mall', name: 'City Mall' },
+    { id: 'byd_60m', name: 'BYD 60M' }
+  ];
 
   useEffect(() => {
     fetchSettings();
@@ -45,12 +53,17 @@ const Settings = () => {
   const fetchSettings = async () => {
     try {
       const res = await api.get('/api/settings');
+      const normalizedData = {};
+      Object.keys(res.data).forEach(key => {
+        if (key.endsWith('_time')) {
+          normalizedData[key] = normalizeTimeValue(res.data[key]);
+        } else {
+          normalizedData[key] = res.data[key];
+        }
+      });
       setSettings((current) => ({
         ...current,
-        ...res.data,
-        order_start_time: normalizeTimeValue(res.data.order_start_time),
-        order_end_time: normalizeTimeValue(res.data.order_end_time),
-        report_time: normalizeTimeValue(res.data.report_time)
+        ...normalizedData
       }));
     } catch (error) {
       toast.error('Failed to fetch settings');
@@ -163,78 +176,216 @@ const Settings = () => {
         <p className="text-slate-500 text-xs sm:text-sm">Configure Telegram bot and system-wide parameters</p>
       </div>
 
+      {/* Elegant Tab Switcher */}
+      <div className="flex border-b border-slate-100 dark:border-slate-800 gap-4 sm:gap-6 overflow-x-auto pb-px">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap outline-none cursor-pointer ${
+              activeTab === tab.id
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
+            }`}
+          >
+            {tab.name}
+          </button>
+        ))}
+      </div>
+
       <form
         onSubmit={handleSubmit}
         className="space-y-8 motion-preset-fade motion-duration-200"
       >
-        {/* Telegram Config */}
-        <div
-          className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
-        >
-          <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-            <MessageSquare className="text-primary-500" size={20} />
-            <h3 className="font-bold text-slate-800 dark:text-white">Telegram Configuration</h3>
-          </div>
-          <div className="p-4 sm:p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Bot Token</label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
-                  placeholder="Enter your bot token"
-                  value={settings.bot_token}
-                  onChange={(e) => setSettings({ ...settings, bot_token: e.target.value })}
-                />
+        {activeTab === 'global' && (
+          <div className="space-y-8 motion-preset-fade motion-duration-200">
+            {/* Telegram Config */}
+            <div
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <MessageSquare className="text-primary-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Telegram Configuration</h3>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Group ID</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
-                  placeholder="-100xxxxxxxxx"
-                  value={settings.group_id}
-                  onChange={(e) => setSettings({ ...settings, group_id: e.target.value })}
-                />
+              <div className="p-4 sm:p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Bot Token</label>
+                    <input
+                      type="password"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
+                      placeholder="Enter your bot token"
+                      value={settings.bot_token}
+                      onChange={(e) => setSettings({ ...settings, bot_token: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Group ID</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
+                      placeholder="-100xxxxxxxxx"
+                      value={settings.group_id}
+                      onChange={(e) => setSettings({ ...settings, group_id: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Schedule Config */}
-        <div
-          className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
-        >
-          <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-            <Clock className="text-primary-500" size={20} />
-            <h3 className="font-bold text-slate-800 dark:text-white">Schedule Settings</h3>
-          </div>
-          <div className="p-4 sm:p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order Start Time</label>
-                <TimePicker
-                  value={settings.order_start_time}
-                  onChange={(e) => setSettings({ ...settings, order_start_time: e.target.value })}
-                />
+            {/* Schedule Config */}
+            <div
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <Clock className="text-primary-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Schedule Settings</h3>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order End Time</label>
-                <TimePicker
-                  value={settings.order_end_time}
-                  onChange={(e) => setSettings({ ...settings, order_end_time: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Report Send Time</label>
-                <TimePicker
-                  value={settings.report_time}
-                  onChange={(e) => setSettings({ ...settings, report_time: e.target.value })}
-                />
+              <div className="p-4 sm:p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order Start Time</label>
+                    <TimePicker
+                      value={settings.order_start_time}
+                      onChange={(e) => setSettings({ ...settings, order_start_time: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order End Time</label>
+                    <TimePicker
+                      value={settings.order_end_time}
+                      onChange={(e) => setSettings({ ...settings, order_end_time: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Report Send Time</label>
+                    <TimePicker
+                      value={settings.report_time}
+                      onChange={(e) => setSettings({ ...settings, report_time: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {activeTab !== 'global' && (
+          <div className="space-y-6 motion-preset-fade motion-duration-200">
+            {/* Override Toggle */}
+            <div className="flex items-center justify-between p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+              <div>
+                <h4 className="font-bold text-slate-800 dark:text-white">
+                  Enable custom settings for {activeTab === 'byd_6a' ? 'BYD 6A' : activeTab === 'city_mall' ? 'City Mall' : 'BYD 60M'}
+                </h4>
+                <p className="text-slate-500 text-xs mt-0.5">Override global configurations and schedule for this branch</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={settings[`branch_enabled_${activeTab}`] === 'true'}
+                  onChange={(e) => {
+                    setSettings({
+                      ...settings,
+                      [`branch_enabled_${activeTab}`]: e.target.checked ? 'true' : 'false'
+                    });
+                  }}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-primary-600"></div>
+              </label>
+            </div>
+
+            {settings[`branch_enabled_${activeTab}`] !== 'true' ? (
+              <div className="p-8 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center space-y-4">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  This branch is currently inheriting all <strong className="text-primary-500">Global Settings</strong>.
+                </p>
+                <div className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                  <div className="text-left font-semibold">Telegram Group ID:</div>
+                  <div className="text-right font-mono font-bold text-slate-600 dark:text-slate-300">{settings.group_id || 'Not configured'}</div>
+                  <div className="text-left font-semibold">Order Window:</div>
+                  <div className="text-right font-mono font-bold text-slate-600 dark:text-slate-300">{settings.order_start_time || '07:00'} - {settings.order_end_time || '16:00'}</div>
+                  <div className="text-left font-semibold">Daily Report Time:</div>
+                  <div className="text-right font-mono font-bold text-slate-600 dark:text-slate-300">{settings.report_time || '16:20'}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Branch Telegram Config */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                    <MessageSquare className="text-primary-500" size={20} />
+                    <h3 className="font-bold text-slate-800 dark:text-white">Telegram Configuration ({activeTab === 'byd_6a' ? 'BYD 6A' : activeTab === 'city_mall' ? 'City Mall' : 'BYD 60M'})</h3>
+                  </div>
+                  <div className="p-4 sm:p-6 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Bot Token</label>
+                        <input
+                          type="password"
+                          disabled
+                          className="w-full px-4 py-2.5 bg-slate-100 dark:bg-slate-800/80 border-none rounded-xl outline-none text-slate-400 cursor-not-allowed"
+                          placeholder="Bot token is system-wide"
+                          value={settings.bot_token}
+                        />
+                        <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">System-wide parameters cannot be customized per branch.</span>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Branch Group ID</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
+                          placeholder="Leave blank to use global Group ID"
+                          value={settings[`branch_group_id_${activeTab}`] || ''}
+                          onChange={(e) => setSettings({ ...settings, [`branch_group_id_${activeTab}`]: e.target.value })}
+                        />
+                        <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">If empty, notifications fallback to main group: {settings.group_id || 'Not set'}.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Branch Schedule Config */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                    <Clock className="text-primary-500" size={20} />
+                    <h3 className="font-bold text-slate-800 dark:text-white">Schedule Settings ({activeTab === 'byd_6a' ? 'BYD 6A' : activeTab === 'city_mall' ? 'City Mall' : 'BYD 60M'})</h3>
+                  </div>
+                  <div className="p-4 sm:p-6 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order Start Time</label>
+                        <TimePicker
+                          value={settings[`branch_order_start_time_${activeTab}`] || ''}
+                          onChange={(e) => setSettings({ ...settings, [`branch_order_start_time_${activeTab}`]: e.target.value })}
+                        />
+                        <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">Fallback: {settings.order_start_time || '07:00'}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order End Time</label>
+                        <TimePicker
+                          value={settings[`branch_order_end_time_${activeTab}`] || ''}
+                          onChange={(e) => setSettings({ ...settings, [`branch_order_end_time_${activeTab}`]: e.target.value })}
+                        />
+                        <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">Fallback: {settings.order_end_time || '16:00'}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Report Send Time</label>
+                        <TimePicker
+                          value={settings[`branch_report_time_${activeTab}`] || ''}
+                          onChange={(e) => setSettings({ ...settings, [`branch_report_time_${activeTab}`]: e.target.value })}
+                        />
+                        <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">Fallback: {settings.report_time || '16:20'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end">
           <button
