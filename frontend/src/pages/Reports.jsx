@@ -30,10 +30,11 @@ const statusOptions = [
 ];
 
 const periodOptions = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'custom', label: 'Custom' }
+  { value: 'daily', label: 'Daily Orders' },
+  { value: 'weekly', label: 'Weekly Summary' },
+  { value: 'monthly', label: 'Daily Report (Matrix)' },
+  { value: 'summary', label: 'Summary Report' },
+  { value: 'custom', label: 'Custom Range' }
 ];
 
 
@@ -47,6 +48,17 @@ const getPeriodRange = (period, baseDate = today) => {
     return {
       startDate: format(startOfWeek(baseDate, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
       endDate: format(endOfWeek(baseDate, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    };
+  }
+
+  if (period === 'monthly' || period === 'summary') {
+    const y = baseDate.getFullYear();
+    const m = baseDate.getMonth();
+    const firstDay = format(new Date(y, m, 1), 'yyyy-MM-dd');
+    const lastDay = format(new Date(y, m + 1, 0), 'yyyy-MM-dd');
+    return {
+      startDate: firstDay,
+      endDate: lastDay
     };
   }
 
@@ -71,16 +83,22 @@ const Reports = () => {
   });
   const isMonthlyReport = filters.period === 'monthly';
   const isSummaryReport = filters.period === 'weekly';
-  const isDetailedReport = !isSummaryReport && !isMonthlyReport;
+  const isCustomSummaryReport = filters.period === 'summary';
+  const isDetailedReport = filters.period === 'daily' || filters.period === 'custom';
   const selectedMonth = filters.month || tomorrowMonth;
   const monthlyBaseDate = new Date(`${selectedMonth}-01T00:00:00`);
   const daysInMonth = new Date(monthlyBaseDate.getFullYear(), monthlyBaseDate.getMonth() + 1, 0).getDate();
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  
   const displayedReports = normalizedSearchTerm
     ? reports.filter(report => (
       report.full_name?.toLowerCase().includes(normalizedSearchTerm) ||
       report.branch?.toLowerCase().includes(normalizedSearchTerm) ||
-      report.status?.toLowerCase().includes(normalizedSearchTerm)
+      report.status?.toLowerCase().includes(normalizedSearchTerm) ||
+      report.position?.toLowerCase().includes(normalizedSearchTerm) ||
+      report.department?.toLowerCase().includes(normalizedSearchTerm) ||
+      report.byd_id?.toLowerCase().includes(normalizedSearchTerm) ||
+      report.hx_id?.toLowerCase().includes(normalizedSearchTerm)
     ))
     : reports;
 
@@ -118,7 +136,7 @@ const Reports = () => {
       const link = document.createElement('a');
 
       link.href = url;
-      const filenameRange = isMonthlyReport
+      const filenameRange = isMonthlyReport || isCustomSummaryReport
         ? selectedMonth
         : filters.startDate === filters.endDate
           ? filters.startDate
@@ -134,6 +152,27 @@ const Reports = () => {
     }
   };
 
+  const getSummaryDateHeaderLabel = () => {
+    try {
+      const start = new Date(`${filters.startDate}T00:00:00`);
+      const end = new Date(`${filters.endDate}T00:00:00`);
+      const getOrdinal = (d) => {
+        if (d > 3 && d < 21) return 'th';
+        switch (d % 10) {
+          case 1:  return "st";
+          case 2:  return "nd";
+          case 3:  return "rd";
+          default: return "th";
+        }
+      };
+      const startStr = `${String(start.getDate()).padStart(2, '0')}${getOrdinal(start.getDate())}`;
+      const endStr = `${String(end.getDate()).padStart(2, '0')}${getOrdinal(end.getDate())}`;
+      const monthYear = end.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      return `${startStr}-${endStr} ${monthYear}`;
+    } catch (e) {
+      return 'Total Meals';
+    }
+  };
 
   const updatePeriod = (period) => {
     const range = getPeriodRange(period, new Date(`${filters.date}T00:00:00`));
@@ -142,7 +181,7 @@ const Reports = () => {
       period,
       ...range,
       date: period === 'daily' ? range.startDate : filters.date,
-      month: period === 'monthly' ? filters.month : filters.month
+      month: filters.month
     });
   };
 
@@ -160,18 +199,22 @@ const Reports = () => {
   };
 
   const updateMonth = (month) => {
+    const selected = month || tomorrowMonth;
+    const baseDate = new Date(`${selected}-01T00:00:00`);
+    const range = getPeriodRange(filters.period, baseDate);
     setFilters({
       ...filters,
-      month: month || tomorrowMonth
+      month: selected,
+      ...range
     });
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Lunch Reports</h2>
-          <p className="text-slate-500 text-xs sm:text-sm">View and export lunch order reports by day, week, month, or date range</p>
+          <p className="text-xs text-slate-500 sm:text-sm">View and export lunch order reports by day, week, month, or date range</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -191,9 +234,9 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 items-end">
-        <div className="space-y-1 w-full">
-          <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+      <div className="grid items-end grid-cols-1 gap-3 p-3 bg-white border shadow-sm dark:bg-slate-900 sm:p-4 rounded-2xl border-slate-100 dark:border-slate-800 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 sm:gap-4">
+        <div className="w-full space-y-1">
+          <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
             <CalendarRange size={12} />
             Range
           </label>
@@ -206,12 +249,12 @@ const Reports = () => {
             className="w-full"
           />
         </div>
-        <div className="space-y-1 w-full">
-          <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+        <div className="w-full space-y-1">
+          <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
             <Calendar size={12} />
-            {isMonthlyReport ? 'Month' : filters.period === 'daily' ? 'Order Date' : 'Base Date'}
+            {(isMonthlyReport || isCustomSummaryReport) ? 'Month' : filters.period === 'daily' ? 'Order Date' : 'Base Date'}
           </label>
-          {isMonthlyReport ? (
+          {(isMonthlyReport || isCustomSummaryReport) ? (
             <SelectMonth
               value={filters.month}
               onChange={(e) => updateMonth(e.target.value)}
@@ -227,16 +270,16 @@ const Reports = () => {
         </div>
         {filters.period === 'custom' && (
           <>
-            <div className="space-y-1 w-full">
-              <label className="text-xs font-semibold text-slate-500 uppercase">Start Date</label>
+            <div className="w-full space-y-1">
+              <label className="text-xs font-semibold uppercase text-slate-500">Start Date</label>
               <SelectDate
                 value={filters.startDate}
                 onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
                 className="w-full"
               />
             </div>
-            <div className="space-y-1 w-full">
-              <label className="text-xs font-semibold text-slate-500 uppercase">End Date</label>
+            <div className="w-full space-y-1">
+              <label className="text-xs font-semibold uppercase text-slate-500">End Date</label>
               <SelectDate
                 value={filters.endDate}
                 onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
@@ -245,8 +288,8 @@ const Reports = () => {
             </div>
           </>
         )}
-        <div className="space-y-1 w-full">
-          <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+        <div className="w-full space-y-1">
+          <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
             <Building size={12} />
             Branch
           </label>
@@ -260,8 +303,8 @@ const Reports = () => {
           />
         </div>
         {isDetailedReport && (
-          <div className="space-y-1 w-full">
-            <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+          <div className="w-full space-y-1">
+            <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
               <Utensils size={12} />
               Status
             </label>
@@ -276,16 +319,16 @@ const Reports = () => {
           </div>
         )}
         {!isSummaryReport && (
-          <div className="space-y-1 w-full sm:col-span-2 lg:col-span-1">
-            <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+          <div className="w-full space-y-1 sm:col-span-2 lg:col-span-1">
+            <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
               <Search size={12} />
               Search Staff
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <Search className="absolute -translate-y-1/2 left-3 top-1/2 text-slate-400" size={18} />
               <input
                 type="text"
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition"
+                className="w-full py-2 pl-10 pr-4 transition border-none outline-none bg-slate-50 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary-500"
                 placeholder="Search staff, branch, or status..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -295,36 +338,50 @@ const Reports = () => {
         )}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-        {isMonthlyReport && (
+      <div className="overflow-hidden bg-white border shadow-sm dark:bg-slate-900 rounded-2xl border-slate-100 dark:border-slate-800">
+        {(isMonthlyReport || isCustomSummaryReport) && (
           <>
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-center shrink-0">
-              <h3 className="font-bold text-lg text-slate-800 dark:text-white">
-                Report For {format(monthlyBaseDate, 'MMMM-yyyy')} ({filters.branch || 'All Branches'})
+            <div className="px-6 py-4 text-center border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                {isMonthlyReport ? 'Daily Report' : 'Summary Report'} For {format(monthlyBaseDate, 'MMMM-yyyy')} ({filters.branch || 'All Branches'})
               </h3>
             </div>
-            {/* Horizontal Swipe Tip Banner for Monthly Sheet on Mobile */}
+            {/* Horizontal Swipe Tip Banner for Monthly/Summary Sheet on Mobile */}
             <div className="md:hidden bg-primary-50 dark:bg-primary-950/20 px-4 py-2.5 text-center border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-primary-600 dark:text-primary-400 flex items-center justify-center gap-1.5 animate-pulse shrink-0">
-              <span>💡 Tip: Swipe horizontally on the calendar below to view all days</span>
+              <span>💡 Tip: Swipe horizontally to view all columns</span>
             </div>
           </>
         )}
 
         {/* ── Desktop View Table ── */}
-        <div className={cn("overflow-x-auto", !isMonthlyReport && "hidden md:block")}>
+        <div className={cn("overflow-x-auto", !isMonthlyReport && !isCustomSummaryReport && "hidden md:block")}>
           <table className="w-full text-left">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-sm uppercase tracking-wider">
+            <thead className="text-sm tracking-wider uppercase bg-slate-50 dark:bg-slate-800/50 text-slate-500">
               {isMonthlyReport ? (
                 <tr>
                   <th className="px-3 py-4 font-semibold text-center">No</th>
                   <th className="px-4 py-4 font-semibold min-w-[180px]">Staff Name</th>
-                  <th className="px-4 py-4 font-semibold min-w-[130px]">Brand</th>
+                  <th className="px-4 py-4 font-semibold text-center min-w-[90px]">Price</th>
                   {Array.from({ length: daysInMonth }, (_, index) => (
                     <th key={index + 1} className="px-2 py-4 font-semibold text-center min-w-10">
-                      {index + 1}
+                      {monthlyBaseDate.getMonth() + 1}/{index + 1}
                     </th>
                   ))}
-                  <th className="px-4 py-4 font-semibold text-center">Total</th>
+                  <th className="px-4 py-4 font-semibold text-center min-w-[100px]">Total Meal</th>
+                  <th className="px-4 py-4 font-semibold text-center min-w-[100px]">Total Cost</th>
+                </tr>
+              ) : isCustomSummaryReport ? (
+                <tr>
+                  <th className="px-3 py-4 font-semibold text-center">No</th>
+                  <th className="px-4 py-4 font-semibold min-w-[100px]">BYD ID</th>
+                  <th className="px-4 py-4 font-semibold min-w-[100px]">HX ID</th>
+                  <th className="px-4 py-4 font-semibold min-w-[180px]">Staff Name</th>
+                  <th className="px-4 py-4 font-semibold min-w-[160px]">Position</th>
+                  <th className="px-4 py-4 font-semibold min-w-[140px]">Department</th>
+                  <th className="px-4 py-4 font-semibold text-center min-w-[120px]">Price Charge</th>
+                  <th className="px-4 py-4 font-semibold text-center min-w-[140px]">{getSummaryDateHeaderLabel()}</th>
+                  <th className="px-4 py-4 font-semibold text-center min-w-[160px]">Free for Staff</th>
+                  <th className="px-4 py-4 font-semibold text-center min-w-[140px]">Total Amount</th>
                 </tr>
               ) : isSummaryReport ? (
                 <tr>
@@ -348,7 +405,9 @@ const Reports = () => {
                 {loading ? (
                   [1, 2, 3].map(i => (
                     <tr key={`loading-${i}`} className="animate-pulse">
-                      <td colSpan={isMonthlyReport ? daysInMonth + 4 : isSummaryReport ? 6 : 4} className="px-6 py-4"><div className="h-6 bg-slate-100 dark:bg-slate-800 rounded" /></td>
+                      <td colSpan={isMonthlyReport ? daysInMonth + 5 : isCustomSummaryReport ? 10 : isSummaryReport ? 6 : 4} className="px-6 py-4">
+                        <div className="h-6 rounded bg-slate-100 dark:bg-slate-800" />
+                      </td>
                     </tr>
                   ))
                 ) : displayedReports.length === 0 ? (
@@ -356,43 +415,72 @@ const Reports = () => {
                     key="empty"
                     className="motion-preset-fade motion-duration-200"
                   >
-                    <td colSpan={isMonthlyReport ? daysInMonth + 4 : isSummaryReport ? 6 : 4} className="px-6 py-12 text-center text-slate-500">No records found for the selected criteria</td>
+                    <td colSpan={isMonthlyReport ? daysInMonth + 5 : isCustomSummaryReport ? 10 : isSummaryReport ? 6 : 4} className="px-6 py-12 text-center text-slate-500">No records found for the selected criteria</td>
                   </tr>
                 ) : (
                   displayedReports.map((report, index) => {
                     const rowKey = isMonthlyReport 
                       ? (report.user_id || `monthly-${index}`) 
-                      : isSummaryReport 
-                        ? `${report.order_date}-${report.branch}-${index}` 
-                        : `${report.user_id}-${report.order_date}-${index}`;
+                      : isCustomSummaryReport
+                        ? `summary-${report.user_id}-${index}`
+                        : isSummaryReport 
+                          ? `${report.order_date}-${report.branch}-${index}` 
+                          : `${report.user_id}-${report.order_date}-${index}`;
 
                     return isMonthlyReport ? (
                       <tr
                         key={rowKey}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
+                        className="text-sm font-medium transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30 motion-preset-fade motion-duration-200 text-slate-700 dark:text-slate-200"
                       >
-                        <td className="px-3 py-3 text-center text-slate-500 dark:text-slate-400">{index + 1}</td>
-                        <td className="px-4 py-3 font-medium text-slate-800 dark:text-white">{report.full_name}</td>
-                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{report.branch}</td>
+                        <td className="px-3 py-3 font-mono text-xs text-center text-slate-500 dark:text-slate-400">{index + 1}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{report.full_name}</td>
+                        <td className="px-4 py-3 font-mono text-center text-slate-500 dark:text-slate-400">
+                          {report.price === undefined || report.price === 0 ? '$ -' : `$ ${report.price.toFixed(2)}`}
+                        </td>
                         {Array.from({ length: daysInMonth }, (_, dayIndex) => {
                           const day = dayIndex + 1;
                           const status = report.days?.[day];
                           return (
-                            <td key={day} className="px-1 py-2">
-                              <div className={cn(
-                                "mx-auto h-7 w-9 border border-slate-200 dark:border-slate-700 rounded-sm transition-colors duration-200",
-                                status === 'ordered' && "bg-green-500 border-green-500",
-                                status !== 'ordered' && "bg-red-500 border-red-500"
-                              )} />
+                            <td key={day} className="px-1 py-2 text-center">
+                              {status === 'ordered' ? (
+                                <div className="mx-auto h-6 w-8 bg-emerald-500 border border-emerald-600 rounded flex items-center justify-center text-white text-[11px] font-black font-mono">1</div>
+                              ) : (
+                                <div className="w-8 h-6 mx-auto border rounded bg-rose-500/10 border-rose-200/50 dark:border-rose-950/50" />
+                              )}
                             </td>
                           );
                         })}
-                        <td className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-white">{report.total}</td>
+                        <td className="px-4 py-3 font-mono font-bold text-center text-slate-800 dark:text-white">{report.total_meal ?? 0}</td>
+                        <td className="px-4 py-3 font-mono font-bold text-center text-slate-800 dark:text-white">
+                          {report.total_cost === undefined || report.total_cost === 0 ? '$ -' : `$ ${report.total_cost.toFixed(2)}`}
+                        </td>
+                      </tr>
+                    ) : isCustomSummaryReport ? (
+                      <tr
+                        key={rowKey}
+                        className="text-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30 motion-preset-fade motion-duration-200 text-slate-700 dark:text-slate-200"
+                      >
+                        <td className="px-3 py-3 font-mono text-xs text-center text-slate-500 dark:text-slate-400">{index + 1}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{report.byd_id || '—'}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{report.hx_id || '—'}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">{report.full_name}</td>
+                        <td className="px-4 py-3 text-center text-slate-500 dark:text-slate-400 font-mono">{report.position || '—'}</td>
+                        <td className="px-4 py-3 text-center text-slate-500 dark:text-slate-400 font-mono">{report.department || '—'}</td>
+                        <td className="px-4 py-3 font-mono text-center text-slate-500 dark:text-slate-400">
+                          {report.price === undefined || report.price === 0 ? '$ -' : `$ ${report.price.toFixed(2)}`}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-bold text-center text-slate-800 dark:text-white">{report.total_meal ?? 0}</td>
+                        <td className="px-4 py-3 font-mono text-center text-slate-500 dark:text-slate-400">
+                          {report.free_amount === undefined || report.free_amount === 0 ? '$ -' : `$ ${report.free_amount.toFixed(2)}`}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-bold text-center text-slate-800 dark:text-white">
+                          {report.total_amount === undefined || report.total_amount === 0 ? '$ -' : `$ ${report.total_amount.toFixed(2)}`}
+                        </td>
                       </tr>
                     ) : isSummaryReport ? (
                       <tr
                         key={rowKey}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
+                        className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30 motion-preset-fade motion-duration-200"
                       >
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
                           {report.order_date ? format(parseISO(report.order_date), 'MMM dd, yyyy') : '-'}
@@ -406,7 +494,7 @@ const Reports = () => {
                     ) : (
                       <tr
                         key={rowKey}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors motion-preset-fade motion-duration-200"
+                        className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30 motion-preset-fade motion-duration-200"
                       >
                         <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{report.full_name}</td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{report.branch}</td>
@@ -427,23 +515,88 @@ const Reports = () => {
                     );
                   })
                 )}
+                
+                {/* ── Daily Report Bottom Summary Row ── */}
+                {!loading && displayedReports.length > 0 && isMonthlyReport && (
+                  <tr className="font-bold border-t-2 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white">
+                    <td className="px-3 py-3.5 text-center"></td>
+                    <td className="px-4 py-3.5 text-left font-black">TOTAL ORDER:</td>
+                    <td className="px-4 py-3.5"></td>
+                    {Array.from({ length: daysInMonth }, (_, dayIndex) => {
+                      const day = dayIndex + 1;
+                      let dayCount = 0;
+                      displayedReports.forEach(r => {
+                        if (r.days?.[day] === 'ordered') {
+                          dayCount += 1;
+                        }
+                      });
+                      return (
+                        <td key={`sum-${day}`} className="px-1 py-3.5 text-center font-black font-mono text-[11px]">
+                          {dayCount}
+                        </td>
+                      );
+                    })}
+                    <td className="px-4 py-3.5"></td>
+                    <td className="px-4 py-3.5 text-center font-black font-mono text-emerald-600 dark:text-emerald-400">
+                      ${displayedReports.reduce((acc, r) => acc + (r.total_cost || 0), 0).toFixed(2)}
+                    </td>
+                  </tr>
+                )}
+                
+                {/* ── Summary Report Bottom Summary Rows ── */}
+                {!loading && displayedReports.length > 0 && isCustomSummaryReport && (
+                  <>
+                    {/* TOTAL Staff Pay: */}
+                    <tr className="font-bold border-t-2 bg-amber-500/10 dark:bg-amber-950/20 border-slate-200 dark:border-slate-700 text-amber-700 dark:text-amber-400">
+                      <td colSpan={6} className="px-4 py-3.5 text-right font-black">TOTAL Staff Pay:</td>
+                      <td className="px-4 py-3.5 text-center"></td>
+                      <td className="px-4 py-3.5 text-center font-black font-mono">
+                        {displayedReports.reduce((acc, r) => acc + (r.total_meal || 0), 0)}
+                      </td>
+                      <td className="px-4 py-3.5 text-center"></td>
+                      <td className="px-4 py-3.5 text-center font-black font-mono">
+                        ${displayedReports.reduce((acc, r) => acc + (r.total_amount || 0), 0).toFixed(2)}
+                      </td>
+                    </tr>
+                    
+                    {/* TOTAL Full Price: */}
+                    <tr className="font-bold bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-white">
+                      <td colSpan={3} className="px-4 py-3.5 text-right font-black">TOTAL Full Price:</td>
+                      <td colSpan={3} className="px-4 py-3.5"></td>
+                      <td className="px-4 py-3.5 text-center font-black font-mono">$ 3.25</td>
+                      <td className="px-4 py-3.5 text-center font-black font-mono">
+                        ${(displayedReports.reduce((acc, r) => acc + (r.total_meal || 0), 0) * 3.25).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3.5 text-center font-black font-mono">$ -</td>
+                      <td className="px-4 py-3.5 text-center"></td>
+                    </tr>
+                    
+                    {/* TOTAL: */}
+                    <tr className="font-bold border-b-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-200 dark:border-slate-700">
+                      <td colSpan={8} className="px-4 py-3.5 text-right font-black text-base">TOTAL:</td>
+                      <td colSpan={2} className="px-4 py-3.5 text-center font-black font-mono text-base text-emerald-600 dark:text-emerald-400">
+                        ${(displayedReports.reduce((acc, r) => acc + (r.total_meal || 0), 0) * 3.25).toFixed(2)}
+                      </td>
+                    </tr>
+                  </>
+                )}
             </tbody>
           </table>
         </div>
 
-        {/* ── Mobile View Card List (Not for Monthly reports) ── */}
-        {!isMonthlyReport && (
-          <div className="block md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+        {/* ── Mobile View Card List (Not for Monthly/Summary reports) ── */}
+        {!isMonthlyReport && !isCustomSummaryReport && (
+          <div className="block text-sm font-medium divide-y md:hidden divide-slate-100 dark:divide-slate-800 text-slate-600 dark:text-slate-350">
             {loading ? (
               [1, 2, 3].map(i => (
-                <div key={`loading-card-${i}`} className="p-4 animate-pulse space-y-3">
-                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
-                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
-                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/4" />
+                <div key={`loading-card-${i}`} className="p-4 space-y-3 animate-pulse">
+                  <div className="w-1/3 h-4 rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="w-1/2 h-4 rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="w-1/4 h-4 rounded bg-slate-200 dark:bg-slate-800" />
                 </div>
               ))
             ) : displayedReports.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">No records found for the selected criteria</div>
+              <div className="p-8 font-normal text-center text-slate-500">No records found for the selected criteria</div>
             ) : (
               displayedReports.map((report, index) => {
                 const cardKey = isSummaryReport 
@@ -452,47 +605,47 @@ const Reports = () => {
 
                 return isSummaryReport ? (
                   /* Summary Card */
-                  <div key={cardKey} className="p-4 space-y-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                    <div className="flex justify-between items-start">
+                  <div key={cardKey} className="p-4 space-y-3 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-bold text-slate-800 dark:text-white text-base leading-snug">
+                        <h4 className="text-base font-bold leading-snug text-slate-800 dark:text-white">
                           {report.order_date ? format(parseISO(report.order_date), 'MMM dd, yyyy') : '-'}
                         </h4>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Summary Report</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-normal">Summary Report</p>
                       </div>
                       <span className="px-2.5 py-1 bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0">
                         {report.branch}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/60 text-xs">
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg">
-                        <span className="block text-slate-400 dark:text-slate-500 font-medium">Total Staff</span>
-                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300 font-mono">{report.total_staff}</span>
+                    <div className="grid grid-cols-2 gap-3 pt-2 text-xs border-t border-slate-100 dark:border-slate-800/60">
+                      <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                        <span className="block font-medium text-slate-400 dark:text-slate-500">Total Staff</span>
+                        <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-300">{report.total_staff}</span>
                       </div>
-                      <div className="p-2 bg-green-50/50 dark:bg-green-950/10 rounded-lg">
-                        <span className="block text-green-600/70 dark:text-green-500/70 font-medium">Ordered</span>
-                        <span className="text-sm font-bold text-green-600 dark:text-green-400 font-mono">{report.ordered}</span>
+                      <div className="p-2 rounded-lg bg-green-50/50 dark:bg-green-950/10">
+                        <span className="block font-medium text-green-600/70 dark:text-green-500/70">Ordered</span>
+                        <span className="font-mono text-sm font-bold text-green-600 dark:text-green-400">{report.ordered}</span>
                       </div>
-                      <div className="p-2 bg-red-50/50 dark:bg-red-950/10 rounded-lg">
-                        <span className="block text-red-600/70 dark:text-red-500/70 font-medium">Cancelled</span>
-                        <span className="text-sm font-bold text-red-600 dark:text-red-400 font-mono">{report.cancelled}</span>
+                      <div className="p-2 rounded-lg bg-red-50/50 dark:bg-red-950/10">
+                        <span className="block font-medium text-red-600/70 dark:text-red-500/70">Cancelled</span>
+                        <span className="font-mono text-sm font-bold text-red-600 dark:text-red-400">{report.cancelled}</span>
                       </div>
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg">
-                        <span className="block text-slate-400 dark:text-slate-500 font-medium">Not Ordered</span>
-                        <span className="text-sm font-bold text-slate-500 dark:text-slate-400 font-mono">{report.not_ordered}</span>
+                      <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                        <span className="block font-medium text-slate-400 dark:text-slate-500">Not Ordered</span>
+                        <span className="font-mono text-sm font-bold text-slate-500 dark:text-slate-400">{report.not_ordered}</span>
                       </div>
                     </div>
                   </div>
                 ) : (
                   /* Detailed Card */
-                  <div key={cardKey} className="p-4 space-y-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                    <div className="flex justify-between items-start gap-2">
+                  <div key={cardKey} className="p-4 space-y-2 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2.5">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0 mt-0.5">{index + 1}</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0 mt-0.5 font-bold font-mono">{index + 1}</span>
                         <div>
-                        <h4 className="font-bold text-slate-800 dark:text-white text-base leading-snug">{report.full_name}</h4>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                        <h4 className="text-base font-bold leading-snug text-slate-800 dark:text-white">{report.full_name}</h4>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-normal">
                           {report.order_date ? format(parseISO(report.order_date), 'MMM dd, yyyy') : '-'}
                         </p>
                         </div>
