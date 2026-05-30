@@ -160,7 +160,7 @@ const Settings = () => {
     <div className="max-w-4xl space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">System Settings</h2>
-        <p className="text-slate-500">Configure Telegram bot and system-wide parameters</p>
+        <p className="text-slate-500 text-xs sm:text-sm">Configure Telegram bot and system-wide parameters</p>
       </div>
 
       <form
@@ -175,8 +175,8 @@ const Settings = () => {
             <MessageSquare className="text-primary-500" size={20} />
             <h3 className="font-bold text-slate-800 dark:text-white">Telegram Configuration</h3>
           </div>
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-4 sm:p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Bot Token</label>
                 <input
@@ -209,8 +209,8 @@ const Settings = () => {
             <Clock className="text-primary-500" size={20} />
             <h3 className="font-bold text-slate-800 dark:text-white">Schedule Settings</h3>
           </div>
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-4 sm:p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Order Start Time</label>
                 <TimePicker
@@ -240,7 +240,7 @@ const Settings = () => {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
+            className="flex items-center gap-2 px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center"
           >
             {saving ? 'Saving...' : (
               <>
@@ -264,7 +264,7 @@ const Settings = () => {
             <Lock className="text-rose-500" size={20} />
             <h3 className="font-bold text-slate-800 dark:text-white">Reset User / Admin Password</h3>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-6">
             {/* User Select Row */}
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
@@ -281,7 +281,7 @@ const Settings = () => {
             </div>
 
             {/* Passwords Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">New Password</label>
                 <input
@@ -312,7 +312,7 @@ const Settings = () => {
           <button
             type="submit"
             disabled={changingPassword}
-            className="flex items-center gap-2 px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-rose-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
+            className="flex items-center gap-2 px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-rose-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center"
           >
             {changingPassword ? 'Resetting...' : (
               <>

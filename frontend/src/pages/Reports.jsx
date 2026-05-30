@@ -12,6 +12,7 @@ import { toast } from 'react-hot-toast';
 import { addDays, endOfWeek, format, startOfWeek, parseISO } from 'date-fns';
 import SearchSelect from '../components/SearchSelect';
 import SelectDate from '../components/SelectDate';
+import SelectMonth from '../components/SelectMonth';
 import { cn } from '../utils/cx';
 
 const branchOptions = [
@@ -171,7 +172,7 @@ const Reports = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Lunch Reports</h2>
-          <p className="text-slate-500">View and export lunch order reports by day, week, month, or date range</p>
+          <p className="text-slate-500 text-xs sm:text-sm">View and export lunch order reports by day, week, month, or date range</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -191,7 +192,7 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 items-end">
+      <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 items-end">
         <div className="space-y-1 w-full">
           <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
             <CalendarRange size={12} />
@@ -212,11 +213,10 @@ const Reports = () => {
             {isMonthlyReport ? 'Month' : filters.period === 'daily' ? 'Order Date' : 'Base Date'}
           </label>
           {isMonthlyReport ? (
-            <input
-              type="month"
-              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition text-sm font-medium text-slate-700 dark:text-slate-200"
+            <SelectMonth
               value={filters.month}
               onChange={(e) => updateMonth(e.target.value)}
+              className="w-full"
             />
           ) : (
             <SelectDate
@@ -489,11 +489,14 @@ const Reports = () => {
                   /* Detailed Card */
                   <div key={cardKey} className="p-4 space-y-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                     <div className="flex justify-between items-start gap-2">
-                      <div>
+                      <div className="flex items-start gap-2.5">
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0 mt-0.5">{index + 1}</span>
+                        <div>
                         <h4 className="font-bold text-slate-800 dark:text-white text-base leading-snug">{report.full_name}</h4>
                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                           {report.order_date ? format(parseISO(report.order_date), 'MMM dd, yyyy') : '-'}
                         </p>
+                        </div>
                       </div>
                       <span className={cn(
                         "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block shrink-0",

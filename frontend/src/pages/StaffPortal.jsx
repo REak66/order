@@ -296,7 +296,7 @@ const StaffPortal = () => {
           {/* Welcome Card */}
           <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-3xl p-6 text-white shadow-xl shadow-primary-600/20 motion-preset-fade motion-duration-200">
             <p className="text-primary-200 text-sm font-medium mb-1">Welcome back 👋</p>
-            <h2 className="text-2xl font-bold mb-4 leading-tight">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 leading-tight">
               {user?.full_name || 'Staff Member'}
             </h2>
 
@@ -351,7 +351,7 @@ const StaffPortal = () => {
           </div>
 
           {/* Time Window Info */}
-          <div className={`rounded-2xl p-4 border flex items-center justify-between gap-4 motion-preset-fade motion-duration-200 ${
+          <div className={`rounded-2xl p-3 sm:p-4 border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 motion-preset-fade motion-duration-200 ${
             isWithinWindow
               ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
               : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'
@@ -371,7 +371,7 @@ const StaffPortal = () => {
                 )}
               </div>
             </div>
-            <div className={`text-right text-sm font-semibold tabular-nums ${isWithinWindow ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+            <div className={`text-right text-sm font-semibold tabular-nums self-end sm:self-auto ${isWithinWindow ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
               <LiveClock />
             </div>
           </div>

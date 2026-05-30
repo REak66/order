@@ -22,10 +22,36 @@ body {
   display: flex;
   min-width: 320px;
   min-height: 100vh;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }
 
 #root {
   width: 100%;
+}
+
+/* Mobile touch optimizations */
+button,
+a,
+[role="button"],
+input[type="submit"],
+select {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Ensure minimum touch target size on mobile */
+@media (max-width: 640px) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 36px;
+  }
+}
+
+/* Safe area padding for iOS notch/home indicator */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @layer base {

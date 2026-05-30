@@ -15,6 +15,12 @@ const SearchSelect = ({
   disabled = false,
 }) => {
   const selectRef = useRef(null);
+  const onChangeRef = useRef(onChange);
+
+  // Keep ref up to date with latest onChange prop
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   // Initialize and autoInit HSSelect
   useEffect(() => {
@@ -38,8 +44,8 @@ const SearchSelect = ({
 
     // Propagate native change event to the React onChange callback
     const handleNativeChange = (e) => {
-      if (onChange) {
-        onChange(e);
+      if (onChangeRef.current) {
+        onChangeRef.current(e);
       }
     };
 

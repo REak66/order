@@ -144,11 +144,11 @@ const ManualOrder = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Manual Staff Order</h2>
-          <p className="text-slate-500">Add lunch orders for staff and update their branch when needed</p>
+          <p className="text-slate-500 text-xs sm:text-sm">Add lunch orders for staff and update their branch when needed</p>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+      <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-end">
         <div className="space-y-1 w-full">
           <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
             <Calendar size={12} />
@@ -375,7 +375,7 @@ const ManualOrder = () => {
                   </div>
 
                   {/* Card Footer: Action Buttons */}
-                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                  <div className="flex items-center gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/60">
                     {/* Order Button */}
                     {currentStatus !== 'ordered' && (
                       <button

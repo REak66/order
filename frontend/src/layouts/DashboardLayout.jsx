@@ -96,7 +96,7 @@ const DashboardLayout = () => {
             onClick={() => setIsSidebarOpen(false)}
           />
           <aside
-            className="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 lg:hidden motion-preset-fade motion-duration-200"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 lg:hidden motion-preset-slide-right motion-duration-200"
           >
             {renderSidebarContent()}
           </aside>
@@ -111,7 +111,7 @@ const DashboardLayout = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 flex items-center justify-between px-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10">
+        <header className="h-14 sm:h-16 flex items-center justify-between px-4 sm:px-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10">
           <button
             className="p-2 lg:hidden text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             onClick={() => setIsSidebarOpen(true)}
@@ -131,7 +131,7 @@ const DashboardLayout = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-safe">
           <Outlet />
         </main>
       </div>

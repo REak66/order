@@ -55,7 +55,7 @@ const Login = ({ isAdminMode = false }) => {
 
       {/* Glass card */}
       <div className="relative z-10 max-w-md w-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-slate-800/80 overflow-hidden motion-preset-fade motion-duration-200">
-        <div className="p-8 md:p-10">
+        <div className="p-6 sm:p-8 md:p-10">
 
           {/* Logo */}
           <div className="flex justify-center mb-6">

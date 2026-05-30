@@ -106,11 +106,11 @@ const StaffManagement = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Staff Management</h2>
-          <p className="text-slate-500">Manage company staff and their branches</p>
+          <p className="text-slate-500 text-xs sm:text-sm">Manage company staff and their branches</p>
         </div>
         <button
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition cursor-pointer font-semibold shadow-md shadow-primary-600/10 hover:scale-[1.02] active:scale-[0.98]"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition cursor-pointer font-semibold shadow-md shadow-primary-600/10 hover:scale-[1.02] active:scale-[0.98] w-full sm:w-auto"
         >
           <Plus size={20} />
           <span>Add Staff</span>
@@ -119,7 +119,7 @@ const StaffManagement = () => {
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
         <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-          <div className="relative max-w-md">
+          <div className="relative w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
@@ -264,7 +264,7 @@ const StaffManagement = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
                   <input

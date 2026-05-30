@@ -97,7 +97,7 @@ const Dashboard = () => {
     <div className="space-y-6 sm:space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Dashboard Overview</h2>
-        <p className="text-slate-500 text-sm">
+        <p className="text-slate-500 text-xs sm:text-sm">
           Real-time lunch order statistics for tomorrow{stats.lunchDate ? ` (${stats.lunchDate})` : ''}
         </p>
       </div>

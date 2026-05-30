@@ -94,8 +94,7 @@ const SelectDate = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute z-50 mt-2 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl left-0 max-w-sm"
-            style={{ width: '310px' }}
+            className="absolute z-50 mt-2 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl left-0 right-0 sm:right-auto sm:left-0 w-auto sm:w-[310px] max-w-[calc(100vw-2rem)]"
           >
             <calendar-date
               ref={calendarRef}
