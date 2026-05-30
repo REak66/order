@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../utils/api';
 import {
   Plus,
@@ -469,7 +470,7 @@ const StaffManagement = () => {
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Staff Management</h2>
           <p className="text-slate-500 text-xs sm:text-sm">Manage company staff and their details</p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
           <button
             onClick={() => {
               setImportStep(1);
@@ -665,8 +666,8 @@ const StaffManagement = () => {
       </div>
 
       {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           {/* Animated Overlay Backdrop */}
           <div
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm motion-preset-fade motion-duration-200"
@@ -674,19 +675,25 @@ const StaffManagement = () => {
           />
 
           {/* Animated Modal Dialog */}
-          <div
+          {/* Animated Modal Dialog */}
+          <form
+            onSubmit={handleSubmit}
             className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 motion-preset-fade motion-duration-200 max-h-[calc(100vh-40px)] flex flex-col"
           >
               <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
                 <h3 className="text-xl font-bold text-slate-800 dark:text-white">
                   {editingStaff ? 'Edit Staff' : 'Add New Staff'}
                 </h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                >
                   <X size={24} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
@@ -853,29 +860,33 @@ const StaffManagement = () => {
                   )}
                 </div>
 
-                <div className="pt-4 flex gap-3 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 py-2.5 text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition shadow-lg shadow-primary-600/15 cursor-pointer animate-duration-200"
-                  >
-                    {editingStaff ? 'Save Changes' : 'Add Staff'}
-                  </button>
-                </div>
-              </form>
-            </div>
-        </div>
+                {/* Spacer to prevent absolute select dropdown clipping at the bottom of the scroll container */}
+                <div className="h-32 shrink-0" />
+              </div>
+
+              <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 py-2.5 text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition shadow-lg shadow-primary-600/15 cursor-pointer animate-duration-200 text-sm"
+                >
+                  {editingStaff ? 'Save Changes' : 'Add Staff'}
+                </button>
+              </div>
+          </form>
+        </div>,
+        document.body
       )}
 
       {/* Import Modal */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {isImportModalOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           {/* Animated Overlay Backdrop */}
           <div
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm motion-preset-fade motion-duration-200"
@@ -953,33 +964,29 @@ const StaffManagement = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
-                    Parsed <span className="font-bold text-slate-700 dark:text-slate-300">{parsedRows.length}</span> rows. You can click any cell to edit details inline before saving.
-                  </div>
-                </div>
-
-                {/* Step 2 Review Table Container */}
-                <div className="flex-1 overflow-x-auto overflow-y-auto p-6 min-h-0">
-                  <table className="min-w-[1000px] w-full text-left table-auto border-collapse">
-                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 text-xs uppercase tracking-wider sticky top-0 z-10">
+              <div className="flex flex-col flex-1 overflow-hidden min-h-0 w-full">
+                {/* Spacious spreadsheet scroll block */}
+                <div className="flex-1 overflow-auto px-6 py-2 min-h-0 w-full">
+                  <table className="w-full text-left table-auto border-collapse min-w-[1000px] border border-slate-200 dark:border-slate-800">
+                    <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider z-10">
                       <tr>
-                        <th className="px-3 py-3 font-semibold text-center w-12 rounded-l-lg">No.</th>
-                        <th className="px-3 py-3 font-semibold w-24">BYD ID</th>
-                        <th className="px-3 py-3 font-semibold w-24">HX ID</th>
-                        <th className="px-3 py-3 font-semibold min-w-[150px]">Full Name *</th>
-                        <th className="px-3 py-3 font-semibold min-w-[120px]">Username *</th>
-                        <th className="px-3 py-3 font-semibold min-w-[140px]">Position</th>
-                        <th className="px-3 py-3 font-semibold min-w-[140px]">Department</th>
-                        <th className="px-3 py-3 font-semibold w-36">Branch</th>
-                        <th className="px-3 py-3 font-semibold text-center w-16 rounded-r-lg">Delete</th>
+                        <th className="px-3 py-2.5 text-center w-12 border-b border-slate-200 dark:border-slate-800">No.</th>
+                        <th className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">BYD ID</th>
+                        <th className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">HX ID</th>
+                        <th className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">Full Name *</th>
+                        <th className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">Username *</th>
+                        <th className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">Position</th>
+                        <th className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">Department</th>
+                        <th className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">Branch *</th>
+                        <th className="px-3 py-2.5 text-center w-16 border-b border-slate-200 dark:border-slate-800">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                    <tbody className="divide-y divide-slate-150 dark:divide-slate-800 bg-white dark:bg-slate-900 text-xs">
                       {parsedRows.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                          <td className="px-3 py-2 text-center text-slate-400 dark:text-slate-500 font-semibold">{idx + 1}</td>
+                        <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                          <td className="px-3 py-2 text-center text-slate-400 font-bold border-r border-slate-100 dark:border-slate-800/60 w-12 shrink-0">
+                            {idx + 1}
+                          </td>
                           <td className="px-2 py-1.5">
                             <input
                               type="text"
@@ -1049,8 +1056,6 @@ const StaffManagement = () => {
                       ))}
                     </tbody>
                   </table>
-                  {/* Spacer to prevent absolute select dropdown clipping at the bottom of the table parent */}
-                  <div className="h-28 shrink-0" />
                 </div>
 
                 <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col sm:flex-row justify-end gap-3 shrink-0 w-full">
@@ -1072,7 +1077,8 @@ const StaffManagement = () => {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
