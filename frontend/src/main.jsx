@@ -56,7 +56,7 @@ window.addEventListener('unhandledrejection', function(event) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster position="top-right" />
       <App />
     </BrowserRouter>

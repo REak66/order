@@ -7,6 +7,8 @@ const User = require('../models/User');
 const Admin = require('../models/Admin');
 const Setting = require('../models/Setting');
 const Order = require('../models/Order');
+const Position = require('../models/Position');
+const Department = require('../models/Department');
 
 const TIME_ZONE = process.env.TIME_ZONE || 'Asia/Phnom_Penh';
 
@@ -26,10 +28,12 @@ const seedData = async () => {
         await connectDB();
 
         // 1. Clear existing collections
-        console.log('Clearing old database records (Users, Orders, Admins)...');
+        console.log('Clearing old database records (Users, Orders, Admins, Positions, Departments)...');
         await User.deleteMany({});
         await Order.deleteMany({});
         await Admin.deleteMany({});
+        await Position.deleteMany({});
+        await Department.deleteMany({});
 
         // 2. Seed Default Settings (same as app.js logic)
         console.log('Seeding default settings...');
@@ -50,7 +54,16 @@ const seedData = async () => {
         }
         console.log('Settings seeded/updated.');
 
-        // 3. Seed Admin
+        // 3. Seed Positions & Departments
+        console.log('Seeding positions and departments...');
+        const positions = ['Software Engineer', 'QA Engineer', 'Sales Executive', 'HR Specialist', 'Branch Manager', 'Accountant'];
+        const departments = ['Technology', 'Sales', 'Human Resources', 'Operations', 'Finance'];
+
+        await Position.insertMany(positions.map(name => ({ name })));
+        await Department.insertMany(departments.map(name => ({ name })));
+        console.log('Positions and Departments seeded.');
+
+        // 4. Seed Admin
         console.log('Seeding admin user...');
         const adminUsername = process.env.ADMIN_USERNAME || 'admin';
         const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
@@ -61,24 +74,24 @@ const seedData = async () => {
         });
         console.log(`Admin user '${adminUsername}' created.`);
 
-        // 4. Seed Staff/Users
+        // 5. Seed Staff/Users
         console.log('Seeding staff users...');
         const mockUsers = [
-            { telegram_id: 111111, username: 'vireak_chao', full_name: 'Chao Vireak', branch: 'City Mall' },
-            { telegram_id: 222222, username: 'sokha_ly', full_name: 'Ly Sokha', branch: 'BYD 6A' },
-            { telegram_id: 333333, username: 'dara_chann', full_name: 'Chann Dara', branch: 'BYD 60M' },
-            { telegram_id: 444444, username: 'bopha_reach', full_name: 'Reach Bopha', branch: 'City Mall' },
-            { telegram_id: 555555, username: 'chantha_som', full_name: 'Som Chantha', branch: 'BYD 6A' },
-            { telegram_id: 666666, username: 'sothea_nguon', full_name: 'Nguon Sothea', branch: 'BYD 60M' },
-            { telegram_id: 777777, username: 'piseth_heng', full_name: 'Heng Piseth', branch: 'City Mall' },
-            { telegram_id: 888888, username: 'kalyan_sem', full_name: 'Sem Kalyan', branch: 'BYD 6A' },
-            { telegram_id: 999999, username: 'roth_lim', full_name: 'Lim Roth', branch: 'BYD 60M' },
-            { telegram_id: 101010, username: 'chetra_oun', full_name: 'Oun Chetra', branch: 'City Mall' },
-            { telegram_id: 202020, username: 'serey_vuth', full_name: 'Vuth Serey', branch: 'BYD 6A' },
-            { telegram_id: 303030, username: 'narith_kem', full_name: 'Kem Narith', branch: 'BYD 60M' },
-            { telegram_id: 404040, username: 'sophal_meas', full_name: 'Meas Sophal', branch: 'City Mall' },
-            { telegram_id: 505050, username: 'leakhena_te', full_name: 'Te Leakhena', branch: 'BYD 6A' },
-            { telegram_id: 606060, username: 'visal_seng', full_name: 'Seng Visal', branch: 'BYD 60M' }
+            { telegram_id: 111111, username: 'vireak_chao', full_name: 'Chao Vireak', branch: 'City Mall', position: 'Software Engineer', department: 'Technology', byd_id: 'BYD-001', hx_id: 'HX-901' },
+            { telegram_id: 222222, username: 'sokha_ly', full_name: 'Ly Sokha', branch: 'BYD 6A', position: 'QA Engineer', department: 'Technology', byd_id: 'BYD-002', hx_id: 'HX-902' },
+            { telegram_id: 333333, username: 'dara_chann', full_name: 'Chann Dara', branch: 'BYD 60M', position: 'Sales Executive', department: 'Sales', byd_id: 'BYD-003', hx_id: 'HX-903' },
+            { telegram_id: 444444, username: 'bopha_reach', full_name: 'Reach Bopha', branch: 'City Mall', position: 'HR Specialist', department: 'Human Resources', byd_id: 'BYD-004', hx_id: 'HX-904' },
+            { telegram_id: 555555, username: 'chantha_som', full_name: 'Som Chantha', branch: 'BYD 6A', position: 'Branch Manager', department: 'Operations', byd_id: 'BYD-005', hx_id: 'HX-905' },
+            { telegram_id: 666666, username: 'sothea_nguon', full_name: 'Nguon Sothea', branch: 'BYD 60M', position: 'Accountant', department: 'Finance', byd_id: 'BYD-006', hx_id: 'HX-906' },
+            { telegram_id: 777777, username: 'piseth_heng', full_name: 'Heng Piseth', branch: 'City Mall', position: 'Software Engineer', department: 'Technology', byd_id: 'BYD-007', hx_id: 'HX-907' },
+            { telegram_id: 888888, username: 'kalyan_sem', full_name: 'Sem Kalyan', branch: 'BYD 6A', position: 'QA Engineer', department: 'Technology', byd_id: 'BYD-008', hx_id: 'HX-908' },
+            { telegram_id: 999999, username: 'roth_lim', full_name: 'Lim Roth', branch: 'BYD 60M', position: 'Sales Executive', department: 'Sales', byd_id: 'BYD-009', hx_id: 'HX-909' },
+            { telegram_id: 101010, username: 'chetra_oun', full_name: 'Oun Chetra', branch: 'City Mall', position: 'HR Specialist', department: 'Human Resources', byd_id: 'BYD-010', hx_id: 'HX-910' },
+            { telegram_id: 202020, username: 'serey_vuth', full_name: 'Vuth Serey', branch: 'BYD 6A', position: 'Branch Manager', department: 'Operations', byd_id: 'BYD-011', hx_id: 'HX-911' },
+            { telegram_id: 303030, username: 'narith_kem', full_name: 'Kem Narith', branch: 'BYD 60M', position: 'Accountant', department: 'Finance', byd_id: 'BYD-012', hx_id: 'HX-912' },
+            { telegram_id: 404040, username: 'sophal_meas', full_name: 'Meas Sophal', branch: 'City Mall', position: 'Software Engineer', department: 'Technology', byd_id: 'BYD-013', hx_id: 'HX-913' },
+            { telegram_id: 505050, username: 'leakhena_te', full_name: 'Te Leakhena', branch: 'BYD 6A', position: 'Sales Executive', department: 'Sales', byd_id: 'BYD-014', hx_id: 'HX-914' },
+            { telegram_id: 606060, username: 'visal_seng', full_name: 'Seng Visal', branch: 'BYD 60M', position: 'Branch Manager', department: 'Operations', byd_id: 'BYD-015', hx_id: 'HX-915' }
         ];
 
         // Hashing passwords to a default of '123456' for seeds and force change on login
@@ -90,7 +103,7 @@ const seedData = async () => {
         const seededUsers = await User.insertMany(mockUsers);
         console.log(`${seededUsers.length} staff users seeded successfully.`);
 
-        // 5. Seed Order History (past 14 days + tomorrow)
+        // 6. Seed Order History (past 14 days + tomorrow)
         console.log('Seeding order history...');
         const ordersToInsert = [];
         const today = new Date();
@@ -115,9 +128,6 @@ const seedData = async () => {
                     status = 'not_ordered';
                 }
 
-                // If 'not_ordered', we optionally create it or skip it (app reports handle missing as not_ordered,
-                // but let's insert for complete coverage or skip random ones to keep DB clean).
-                // Let's seed actual documents to fully test statuses
                 ordersToInsert.push({
                     user: user._id,
                     order_date: orderDateStr,

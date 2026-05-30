@@ -12,6 +12,10 @@ const UserSchema = new mongoose.Schema({
         default: 'City Mall'
     },
     role: { type: String, enum: ['staff', 'admin'], default: 'staff' },
+    byd_id: { type: String, default: '' },
+    hx_id: { type: String, default: '' },
+    position: { type: String, default: '' },
+    department: { type: String, default: '' },
     created_at: { type: Date, default: Date.now }
 });
 
