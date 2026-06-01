@@ -544,42 +544,47 @@ const Reports = () => {
                 )}
                 
                 {/* ── Summary Report Bottom Summary Rows ── */}
-                {!loading && displayedReports.length > 0 && isCustomSummaryReport && (
-                  <>
-                    {/* TOTAL Staff Pay: */}
-                    <tr className="font-bold border-t-2 bg-amber-500/10 dark:bg-amber-950/20 border-slate-200 dark:border-slate-700 text-amber-700 dark:text-amber-400">
-                      <td colSpan={6} className="px-4 py-3.5 text-right font-black">TOTAL Staff Pay:</td>
-                      <td className="px-4 py-3.5 text-center"></td>
-                      <td className="px-4 py-3.5 text-center font-black font-mono">
-                        {displayedReports.reduce((acc, r) => acc + (r.total_meal || 0), 0)}
-                      </td>
-                      <td className="px-4 py-3.5 text-center"></td>
-                      <td className="px-4 py-3.5 text-center font-black font-mono">
-                        ${displayedReports.reduce((acc, r) => acc + (r.total_amount || 0), 0).toFixed(2)}
-                      </td>
-                    </tr>
-                    
-                    {/* TOTAL Full Price: */}
-                    <tr className="font-bold bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-white">
-                      <td colSpan={3} className="px-4 py-3.5 text-right font-black">TOTAL Full Price:</td>
-                      <td colSpan={3} className="px-4 py-3.5"></td>
-                      <td className="px-4 py-3.5 text-center font-black font-mono">$ 3.25</td>
-                      <td className="px-4 py-3.5 text-center font-black font-mono">
-                        ${(displayedReports.reduce((acc, r) => acc + (r.total_meal || 0), 0) * 3.25).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3.5 text-center font-black font-mono">$ -</td>
-                      <td className="px-4 py-3.5 text-center"></td>
-                    </tr>
-                    
-                    {/* TOTAL: */}
-                    <tr className="font-bold border-b-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-200 dark:border-slate-700">
-                      <td colSpan={8} className="px-4 py-3.5 text-right font-black text-base">TOTAL:</td>
-                      <td colSpan={2} className="px-4 py-3.5 text-center font-black font-mono text-base text-emerald-600 dark:text-emerald-400">
-                        ${(displayedReports.reduce((acc, r) => acc + (r.total_meal || 0), 0) * 3.25).toFixed(2)}
-                      </td>
-                    </tr>
-                  </>
-                )}
+                {!loading && displayedReports.length > 0 && isCustomSummaryReport && (() => {
+                  const totalMeals = displayedReports.reduce((acc, r) => acc + (r.total_meal || 0), 0);
+                  const totalStaffPay = displayedReports.reduce((acc, r) => acc + (r.total_amount || 0), 0);
+                  const totalFullPrice = (totalMeals * 3.25).toFixed(2);
+                  const formattedStaffPay = totalStaffPay === 0 ? '$ -' : `$ ${totalStaffPay.toFixed(2)}`;
+
+                  return (
+                    <>
+                      {/* TOTAL Staff Pay: */}
+                      <tr className="font-bold border-t-2 bg-amber-500/10 dark:bg-amber-950/20 border-slate-200 dark:border-slate-700 text-amber-700 dark:text-amber-400">
+                        <td colSpan={7} className="px-4 py-3.5 text-right font-black">TOTAL Staff Pay:</td>
+                        <td className="px-4 py-3.5 text-center font-black font-mono">
+                          {totalMeals}
+                        </td>
+                        <td className="px-4 py-3.5 text-center font-black font-mono">$ -</td>
+                        <td className="px-4 py-3.5 text-center font-black font-mono">
+                          {formattedStaffPay}
+                        </td>
+                      </tr>
+                      
+                      {/* TOTAL Full Price: */}
+                      <tr className="font-bold bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-white">
+                        <td colSpan={6} className="px-4 py-3.5 text-right font-black">TOTAL Full Price:</td>
+                        <td className="px-4 py-3.5 text-center font-black font-mono">$ 3.25</td>
+                        <td className="px-4 py-3.5 text-center font-black font-mono">
+                          ${totalFullPrice}
+                        </td>
+                        <td className="px-4 py-3.5 text-center font-black font-mono">$ -</td>
+                        <td className="px-4 py-3.5 text-center font-black font-mono">---</td>
+                      </tr>
+                      
+                      {/* TOTAL: */}
+                      <tr className="font-bold border-b-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-200 dark:border-slate-700">
+                        <td colSpan={9} className="px-4 py-3.5 text-right font-black text-base">TOTAL (Grand Total):</td>
+                        <td className="px-4 py-3.5 text-center font-black font-mono text-base text-emerald-600 dark:text-emerald-400">
+                          ${totalFullPrice}
+                        </td>
+                      </tr>
+                    </>
+                  );
+                })()}
             </tbody>
           </table>
         </div>

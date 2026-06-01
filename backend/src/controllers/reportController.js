@@ -17,6 +17,22 @@ const {
 const { STATUSES, SYMBOLS } = require("../utils/constants");
 const botService = require("../services/botService");
 
+const normalizeText = (text) => {
+  if (!text) return "";
+  const trimmed = text.trim();
+  const upper = trimmed.toUpperCase();
+  if (upper === "IT") return "IT";
+  if (upper === "HR") return "HR";
+  if (upper === "BYD") return "BYD";
+  return trimmed
+    .split(/([\s\-\/]+)/)
+    .map((part) => {
+      if (/[\s\-\/]+/.test(part)) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join("");
+};
+
 const getUserPrice = (user) => {
   // Flat price of $1 per order for all users
   return 1;
@@ -54,6 +70,12 @@ const getReportData = async ({
   const range = getDateRange({ date, startDate, endDate, period, month });
   const usersQuery = branch ? { branch } : {};
   const users = await User.find(usersQuery).sort({ branch: 1, full_name: 1 });
+  
+  // Normalize department and position to ensure correct merging and styling
+  users.forEach((user) => {
+    user.department = normalizeText(user.department);
+    user.position = normalizeText(user.position);
+  });
   const orders = await Order.find({
     order_date: { $gte: range.startDate, $lte: range.endDate },
   }).populate("user");
@@ -646,13 +668,15 @@ exports.exportExcel = asyncHandler(async (req, res) => {
 
     // Row N + 1: TOTAL Staff Pay:
     const totalStaffPayRow = worksheet.addRow({
-      price: "TOTAL Staff Pay:",
+      no: "TOTAL Staff Pay:",
       total_meal: totalMealsSum,
+      free_amount: "$ -",
       total_amount:
         totalStaffPaySum === 0 ? "$ -" : `$ ${totalStaffPaySum.toFixed(2)}`,
     });
     totalStaffPayRow.font = { bold: true, name: "Times New Roman", size: 11 };
     totalStaffPayRow.height = 26;
+    worksheet.mergeCells(totalStaffPayRow.number, 1, totalStaffPayRow.number, 7);
 
     totalStaffPayRow.eachCell({ includeEmpty: true }, (cell) => {
       cell.fill = {
@@ -664,7 +688,7 @@ exports.exportExcel = asyncHandler(async (req, res) => {
 
     // Row N + 2: TOTAL Full Price:
     const totalFullPriceRow = worksheet.addRow({
-      full_name: "TOTAL Full Price:",
+      no: "TOTAL Full Price:",
       price: "$ 3.25",
       total_meal: `$ ${(totalMealsSum * 3.25).toFixed(2)}`,
       free_amount: "$ -",
@@ -677,6 +701,7 @@ exports.exportExcel = asyncHandler(async (req, res) => {
       size: 11,
     };
     totalFullPriceRow.height = 26;
+    worksheet.mergeCells(totalFullPriceRow.number, 1, totalFullPriceRow.number, 6);
 
     totalFullPriceRow.eachCell({ includeEmpty: true }, (cell) => {
       cell.fill = {
@@ -688,15 +713,21 @@ exports.exportExcel = asyncHandler(async (req, res) => {
 
     // Row N + 3: TOTAL:
     const overallTotalRow = worksheet.addRow({
-      free_amount: "TOTAL:",
+      no: "TOTAL (Grand Total):",
       total_amount: `$ ${(totalMealsSum * 3.25).toFixed(2)}`,
     });
     overallTotalRow.font = { bold: true, name: "Times New Roman", size: 11 };
     overallTotalRow.height = 26;
+    worksheet.mergeCells(overallTotalRow.number, 1, overallTotalRow.number, 9);
 
     // Apply borders and alignment for all data cells
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber > 3) {
+        const isStaffPay = rowNumber === totalStaffPayRow.number;
+        const isFullPrice = rowNumber === totalFullPriceRow.number;
+        const isOverall = rowNumber === overallTotalRow.number;
+        const isSummaryRow = isStaffPay || isFullPrice || isOverall;
+
         row.eachCell({ includeEmpty: true }, (cell) => {
           cell.border = {
             top: { style: "thin" },
@@ -706,12 +737,20 @@ exports.exportExcel = asyncHandler(async (req, res) => {
           };
           cell.font = cell.font || { name: "Times New Roman", size: 11 };
 
-          if (cell.col === 4) {
-            cell.alignment = { horizontal: "left", vertical: "middle" };
-          } else if (cell.col === 5 || cell.col === 6) {
-            cell.alignment = { horizontal: "center", vertical: "middle" };
+          if (isSummaryRow) {
+            if (cell.col === 1) {
+              cell.alignment = { horizontal: "right", vertical: "middle" };
+            } else {
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+            }
           } else {
-            cell.alignment = { horizontal: "center", vertical: "middle" };
+            if (cell.col === 4) {
+              cell.alignment = { horizontal: "left", vertical: "middle" };
+            } else if (cell.col === 5 || cell.col === 6) {
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+            } else {
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+            }
           }
         });
       }
@@ -1092,39 +1131,20 @@ exports.exportPDF = asyncHandler(async (req, res) => {
 
     // 3 summary rows at the bottom
     const staffPayRow = [
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "TOTAL Staff Pay:",
+      { content: "TOTAL Staff Pay:", colSpan: 7, styles: { halign: "right" } },
       totalMealsSum,
-      "",
+      "$ -",
       totalStaffPaySum === 0 ? "$ -" : `$ ${totalStaffPaySum.toFixed(2)}`,
     ];
     const fullPriceRow = [
-      "",
-      "",
-      "",
-      "TOTAL Full Price:",
-      "",
-      "",
+      { content: "TOTAL Full Price:", colSpan: 6, styles: { halign: "right" } },
       "$ 3.25",
       `$ ${(totalMealsSum * 3.25).toFixed(2)}`,
       "$ -",
-      "",
+      "---",
     ];
     const overallTotalRow = [
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "TOTAL:",
+      { content: "TOTAL (Grand Total):", colSpan: 9, styles: { halign: "right" } },
       `$ ${(totalMealsSum * 3.25).toFixed(2)}`,
     ];
 
@@ -1233,8 +1253,10 @@ exports.exportPDF = asyncHandler(async (req, res) => {
       didDrawCell: (data) => {
         if (data.section !== "body") return;
 
-        // Record every body cell exact drawn position
-        cellPositions[`${data.row.index}_${data.column.index}`] = {
+        const pageNum = data.pageNumber;
+
+        // Record every body cell exact drawn position on the current page
+        cellPositions[`${pageNum}_${data.row.index}_${data.column.index}`] = {
           x: data.cell.x,
           y: data.cell.y,
           w: data.cell.width,
@@ -1242,20 +1264,35 @@ exports.exportPDF = asyncHandler(async (req, res) => {
         };
 
         // Skip merge overdraw entirely for the 3 coloured summary rows at the bottom
-        // so their gold/blue fill is never wiped by the white merge rectangle
         if (data.row.index >= totalStaffPayIndex) return;
 
-        // When we reach the LAST data row of a multi-row merge group, overdraw it
+        // Overdraw merge groups page-by-page to handle page splitting correctly
         mergeGroups.forEach((g) => {
-          if (
-            g.colIndex !== data.column.index ||
-            data.row.index !== g.endRow ||
-            g.startRow === g.endRow // single-row span: nothing to merge
-          )
-            return;
+          if (g.colIndex !== data.column.index) return;
+          if (data.row.index < g.startRow || data.row.index > g.endRow) return;
 
-          const first = cellPositions[`${g.startRow}_${g.colIndex}`];
-          const last = cellPositions[`${g.endRow}_${g.colIndex}`];
+          // Find the bounds of this group on the current page
+          let firstRowOnPage = null;
+          let lastRowOnPage = null;
+          for (let r = g.startRow; r <= g.endRow; r++) {
+            if (cellPositions[`${pageNum}_${r}_${g.colIndex}`]) {
+              if (firstRowOnPage === null) firstRowOnPage = r;
+              lastRowOnPage = r;
+            }
+          }
+
+          // Trigger overdraw only when we reach the last row of this group on this page
+          if (
+            firstRowOnPage === null ||
+            lastRowOnPage === null ||
+            data.row.index !== lastRowOnPage ||
+            firstRowOnPage === lastRowOnPage // single-row on this page: nothing to merge
+          ) {
+            return;
+          }
+
+          const first = cellPositions[`${pageNum}_${firstRowOnPage}_${g.colIndex}`];
+          const last = cellPositions[`${pageNum}_${lastRowOnPage}_${g.colIndex}`];
           if (!first || !last) return;
 
           const lw = 0.15; // line width matching grid theme

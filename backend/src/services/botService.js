@@ -192,12 +192,14 @@ const buildDailyReportForBranch = async (branchName, date = new Date()) => {
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
     const branch = BRANCHES.find(b => b.name === branchName) || { name: branchName, reportLabel: branchName };
 
-    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
-    report += `📍 ${branch.reportLabel}\n\n`;
-
     const orderedUsers = users.filter(user => (
         orders.some(order => order.user.toString() === user._id.toString())
     ));
+
+    const count = orderedUsers.length;
+
+    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
+    report += `📍 ${branch.reportLabel}: ${count} នាក់\n\n`;
 
     if (orderedUsers.length === 0) {
         report += 'មិនមានអ្នកកម្មង់\n\n';
@@ -206,6 +208,12 @@ const buildDailyReportForBranch = async (branchName, date = new Date()) => {
             .map((user, index) => `${index + 1}. ${formatStaffName(user)}`)
             .join('\n');
         report += '\n\n';
+    }
+
+    if (count > 0) {
+        report += `សរុបចំនួនដែលបានកម្មង់: ${count} នាក់\n\n`;
+    } else {
+        report += `សរុបចំនួនដែលបានកម្មង់: 0 នាក់\n\n`;
     }
 
     report += 'ប្រសិនបើមិនឃើញឈ្មោះរបស់អ្នកសូមទាក់ទង់មកកាន់ @SreyNeang2701 និង @Thaivouchkim សូមអរគុណ!!!';
@@ -264,7 +272,7 @@ const buildDailyReport = async (date = new Date()) => {
     const displayDate = toDisplayDate(lunchDate);
     const users = await User.find({}).sort({ branch: 1, full_name: 1 });
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
-    
+
     let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
 
     const branchReports = BRANCHES.map(branch => {
@@ -273,7 +281,8 @@ const buildDailyReport = async (date = new Date()) => {
             orders.some(order => order.user.toString() === user._id.toString())
         ));
 
-        let branchText = `📍 ${branch.reportLabel}\n\n`;
+        const count = orderedUsers.length;
+        let branchText = `📍 ${branch.reportLabel}: ${count} នាក់\n\n`;
         if (orderedUsers.length === 0) {
             branchText += 'មិនមានអ្នកកម្មង់';
         } else {
@@ -285,6 +294,18 @@ const buildDailyReport = async (date = new Date()) => {
     });
 
     report += branchReports.join('\n\n') + '\n\n';
+
+    const totalSum = users.filter(user =>
+        BRANCHES.some(branch => branch.name === user.branch) &&
+        orders.some(order => order.user.toString() === user._id.toString())
+    ).length;
+
+    if (totalSum > 0) {
+        report += `សរុបចំនួនដែលបានកម្មង់: ${totalSum} នាក់\n\n`;
+    } else {
+        report += `សរុបចំនួនដែលបានកម្មង់: 0 នាក់\n\n`;
+    }
+
     report += 'ប្រសិនបើមិនឃើញឈ្មោះរបស់អ្នកសូមទាក់ទង់មកកាន់ @SreyNeang2701 និង @Thaivouchkim សូមអរគុណ!!!';
 
     return report.trim();
@@ -327,6 +348,8 @@ const buildDailySum = async (date = new Date()) => {
 
     if (totalSum > 0) {
         report += `សរុបចំនួនដែលបានកម្មង់: ${totalSum} នាក់\n\n`;
+    } else {
+        report += `សរុបចំនួនដែលបានកម្មង់: 0 នាក់\n\n`;
     }
     report += 'ប្រសិនបើមិនឃើញឈ្មោះរបស់អ្នកសូមទាក់ទង់មកកាន់ @SreyNeang2701 និង @Thaivouchkim សូមអរគុណ!!!';
 
