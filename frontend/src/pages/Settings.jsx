@@ -26,7 +26,9 @@ const Settings = () => {
     group_id: '',
     order_start_time: '',
     order_end_time: '',
-    report_time: ''
+    report_time: '',
+    supply_bot_token: '',
+    supply_group_id: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,7 +45,8 @@ const Settings = () => {
     { id: 'global', name: 'Global Settings' },
     { id: 'byd_6a', name: 'BYD 6A' },
     { id: 'city_mall', name: 'City Mall' },
-    { id: 'byd_60m', name: 'BYD 60M' }
+    { id: 'byd_60m', name: 'BYD 60M' },
+    { id: 'supply', name: 'Supplier' }
   ];
 
   useEffect(() => {
@@ -113,6 +116,20 @@ const Settings = () => {
   };
 
   const [sendingReport, setSendingReport] = useState(false);
+  const [sendingSupply, setSendingSupply] = useState(false);
+
+  const handleSendToSupply = async () => {
+    setSendingSupply(true);
+    try {
+      const res = await api.post('/api/settings/send-to-supply');
+      toast.success(res.data.message || 'Supplier order summary sent!');
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Failed to send supplier order summary';
+      toast.error(msg);
+    } finally {
+      setSendingSupply(false);
+    }
+  };
 
   const handleSendReportNow = async () => {
     if (!window.confirm('Are you sure you want to send the daily report(s) to Telegram now?')) {
@@ -290,7 +307,7 @@ const Settings = () => {
           </div>
         )}
 
-        {activeTab !== 'global' && (
+        {activeTab !== 'global' && activeTab !== 'supply' && (
           <div className="space-y-6 motion-preset-fade motion-duration-200">
             {/* Override Toggle */}
             <div className="flex items-center justify-between p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
@@ -406,24 +423,101 @@ const Settings = () => {
           </div>
         )}
 
+        {activeTab === 'supply' && (
+          <div className="space-y-8 motion-preset-fade motion-duration-200">
+            {/* Supply Telegram Config */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <MessageSquare className="text-emerald-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Supplier Telegram Configuration</h3>
+              </div>
+              <div className="p-4 sm:p-6 space-y-4">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Configure a separate Telegram bot and group to receive the daily supplier order summary.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Supplier Bot Token</label>
+                    <input
+                      type="password"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition text-slate-800 dark:text-slate-200"
+                      placeholder="Enter supplier bot token"
+                      value={settings.supply_bot_token}
+                      onChange={(e) => setSettings({ ...settings, supply_bot_token: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Supply Group ID</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition text-slate-800 dark:text-slate-200"
+                      placeholder="-100xxxxxxxxx"
+                      value={settings.supply_group_id}
+                      onChange={(e) => setSettings({ ...settings, supply_group_id: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Supply Message Preview */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <Send className="text-emerald-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Message Preview</h3>
+              </div>
+              <div className="p-4 sm:p-6">
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 font-mono text-sm text-slate-700 dark:text-slate-300 space-y-1 border border-slate-100 dark:border-slate-700">
+                  <p>📦 Supplier Order Summary</p>
+                  <p>📅 Date: DD/MM/YYYY</p>
+                  <p>&nbsp;</p>
+                  <p>📍6A order = total(6A) pcs</p>
+                  <p>📍CityMall order = total(CityMall) pcs</p>
+                  <p>📍60M order = total(60M) pcs</p>
+                  <p>&nbsp;</p>
+                  <p>📊 Total order = Total(all branch) pcs</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end gap-4 flex-col sm:flex-row">
-          <button
-            type="button"
-            disabled={sendingReport || saving}
-            onClick={handleSendReportNow}
-            className="flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {sendingReport ? 'Sending...' : (
-              <>
-                <Send size={20} />
-                <span>Send Report Now</span>
-              </>
-            )}
-          </button>
+          {activeTab === 'supply' && (
+            <button
+              type="button"
+              disabled={sendingSupply || saving}
+              onClick={handleSendToSupply}
+              className="flex items-center gap-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendingSupply ? 'Sending...' : (
+                <>
+                  <Send size={20} />
+                  <span>Send to Supplier</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {activeTab !== 'supply' && (
+            <button
+              type="button"
+              disabled={sendingReport || saving}
+              onClick={handleSendReportNow}
+              className="flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendingReport ? 'Sending...' : (
+                <>
+                  <Send size={20} />
+                  <span>Send Report Now</span>
+                </>
+              )}
+            </button>
+          )}
 
           <button
             type="submit"
-            disabled={saving || sendingReport}
+            disabled={saving || sendingReport || sendingSupply}
             className="flex items-center gap-2 px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center disabled:opacity-50"
           >
             {saving ? 'Saving...' : (

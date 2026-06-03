@@ -7,7 +7,9 @@ const DEFAULT_SETTINGS = {
     group_id: '',
     order_start_time: '07:00',
     order_end_time: '16:00',
-    report_time: '16:20'
+    report_time: '16:20',
+    supply_bot_token: '',
+    supply_group_id: ''
 };
 
 const TIME_SETTING_KEYS = ['order_start_time', 'order_end_time', 'report_time'];
@@ -185,4 +187,61 @@ exports.sendReportNow = asyncHandler(async (req, res) => {
         main: sentMain,
         branches: sentBranches
     });
+});
+exports.sendToSupply = asyncHandler(async (req, res) => {
+    const { Telegraf } = require('telegraf');
+    const Order = require('../models/Order');
+    const User = require('../models/User');
+    const { BRANCHES } = require('../utils/constants');
+    const { toLocalIsoDate, getLunchDate } = require('../utils/dateUtils');
+
+    // Load supply settings
+    const supplyBotTokenRow = await Setting.findOne({ key: 'supply_bot_token' });
+    const supplyGroupIdRow = await Setting.findOne({ key: 'supply_group_id' });
+
+    const supplyBotToken = supplyBotTokenRow?.value?.trim() || '';
+    const supplyGroupId = supplyGroupIdRow?.value?.trim() || '';
+
+    if (!supplyBotToken) {
+        return res.status(400).json({ message: 'Supply Bot Token is not configured.' });
+    }
+    if (!supplyGroupId || !/^-?\d+$/.test(supplyGroupId)) {
+        return res.status(400).json({ message: 'Supply Group ID is not configured or invalid.' });
+    }
+
+    // Use the lunch date (same as buildDailyReport) — orders placed today are for tomorrow's lunch
+    const orderDate = getLunchDate();
+    const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
+    const orderedUserIds = new Set(orders.map(o => o.user.toString()));
+
+    const users = await User.find({});
+    const isOrdered = (user) => orderedUserIds.has(user._id.toString());
+
+    // Build per-branch totals
+    const branchTotals = BRANCHES.map(branch => ({
+        label: branch.reportLabel,
+        count: users.filter(u => u.branch === branch.name && isOrdered(u)).length
+    }));
+    const totalAll = branchTotals.reduce((sum, b) => sum + b.count, 0);
+
+    // Format date as DD/MM/YYYY
+    const [year, month, day] = orderDate.split('-');
+    const displayDate = `${day}/${month}/${year}`;
+
+    let message = `📦 Supplier Order Summary\n`;
+    message += `📅 Date: ${displayDate}\n\n`;
+    for (const b of branchTotals) {
+        message += `📍${b.label} order = ${b.count} pcs\n`;
+    }
+    message += `\n📊 Total order = ${totalAll} pcs`;
+
+    try {
+        const supplyBot = new Telegraf(supplyBotToken);
+        await supplyBot.telegram.sendMessage(supplyGroupId, message);
+    } catch (error) {
+        console.error('Failed to send supply message:', error.message);
+        return res.status(500).json({ message: 'Failed to send message to supply group: ' + error.message });
+    }
+
+    res.json({ message: 'Supplier order summary sent successfully!' });
 });
