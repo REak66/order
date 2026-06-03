@@ -250,6 +250,8 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: "Staff not found" });
   }
 
+  const oldBranch = user.branch;
+
   if (branch && user.branch !== branch) {
     user.branch = branch;
     await user.save();
@@ -276,6 +278,13 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
         );
       }
     }
+
+    try {
+      await botService.sendDailyReportUpdate(user, orderDate, oldBranch);
+    } catch (error) {
+      console.error("Failed to send daily report update:", error.message);
+    }
+
     return res.json({ message: "Manual order cleared", user });
   }
 
@@ -311,6 +320,12 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
       console.error("Failed to send cancellation notification:", error.message);
       // Don't fail the request if notification fails
     }
+  }
+
+  try {
+    await botService.sendDailyReportUpdate(user, orderDate, oldBranch);
+  } catch (error) {
+    console.error("Failed to send daily report update:", error.message);
   }
 
   res.json({ message: "Manual order saved", order, user });

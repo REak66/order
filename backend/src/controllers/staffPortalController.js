@@ -170,16 +170,20 @@ exports.updateBranch = asyncHandler(async (req, res) => {
         return res.status(400).json({ message: `Branch must be one of: ${VALID_BRANCHES.join(', ')}` });
     }
 
-    const staff = await User.findByIdAndUpdate(userId, { branch }, { new: true });
-    if (!staff) {
+    // Capture old branch before updating
+    const existingStaff = await User.findById(userId);
+    if (!existingStaff) {
         return res.status(404).json({ message: 'Staff not found' });
     }
+    const oldBranch = existingStaff.branch;
 
-    // If staff has an active order for tomorrow/today, send Telegram notification about the branch update
+    const staff = await User.findByIdAndUpdate(userId, { branch }, { new: true });
+
+    // If staff has an active order for today, send Telegram notification about the branch update
     const lunchDate = getLunchDate();
     const activeOrder = await Order.findOne({ user: userId, order_date: lunchDate, status: 'ordered' });
     if (activeOrder) {
-        bot.sendBranchUpdateNotification(staff, activeOrder).catch(err =>
+        bot.sendBranchUpdateNotification(staff, activeOrder, oldBranch).catch(err =>
             console.error('Portal branch update notification error:', err.message)
         );
     }

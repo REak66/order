@@ -5,7 +5,8 @@ import {
   MessageSquare,
   Clock,
   Lock,
-  KeyRound
+  KeyRound,
+  Send
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -108,6 +109,24 @@ const Settings = () => {
       }
     } catch (error) {
       console.error('Failed to fetch accounts:', error);
+    }
+  };
+
+  const [sendingReport, setSendingReport] = useState(false);
+
+  const handleSendReportNow = async () => {
+    if (!window.confirm('Are you sure you want to send the daily report(s) to Telegram now?')) {
+      return;
+    }
+    setSendingReport(true);
+    try {
+      const res = await api.post('/api/settings/send-now');
+      toast.success(res.data.message || 'Daily report(s) sent successfully');
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Failed to send daily report(s)';
+      toast.error(msg);
+    } finally {
+      setSendingReport(false);
     }
   };
 
@@ -387,11 +406,25 @@ const Settings = () => {
           </div>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-4 flex-col sm:flex-row">
+          <button
+            type="button"
+            disabled={sendingReport || saving}
+            onClick={handleSendReportNow}
+            className="flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sendingReport ? 'Sending...' : (
+              <>
+                <Send size={20} />
+                <span>Send Report Now</span>
+              </>
+            )}
+          </button>
+
           <button
             type="submit"
-            disabled={saving}
-            className="flex items-center gap-2 px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center"
+            disabled={saving || sendingReport}
+            className="flex items-center gap-2 px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center disabled:opacity-50"
           >
             {saving ? 'Saving...' : (
               <>

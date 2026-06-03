@@ -5,5 +5,6 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 router.get('/', authMiddleware, settingsController.getSettings);
 router.post('/', authMiddleware, settingsController.updateSettings);
+router.post('/send-now', authMiddleware, settingsController.sendReportNow);
 
 module.exports = router;

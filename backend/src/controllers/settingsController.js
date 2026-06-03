@@ -121,3 +121,68 @@ exports.updateSettings = asyncHandler(async (req, res) => {
 
     res.json({ message: 'Settings updated' });
 });
+
+exports.sendReportNow = asyncHandler(async (req, res) => {
+    const runningBot = await bot.getRunningBot();
+    if (!runningBot) {
+        return res.status(400).json({ message: 'Telegram bot is not configured or running.' });
+    }
+
+    const { toLocalIsoDate } = require('../utils/dateUtils');
+    const today = toLocalIsoDate();
+    let sentMain = false;
+    let sentBranches = [];
+
+    // 1. Send main daily report
+    const mainGroupId = await bot.getGroupId();
+    if (mainGroupId) {
+        try {
+            const report = await bot.buildDailyReport();
+            await runningBot.telegram.sendMessage(mainGroupId, report);
+            
+            // Set last_report_date
+            await Setting.findOneAndUpdate(
+                { key: 'last_report_date' },
+                { value: today, updated_at: new Date() },
+                { upsert: true }
+            );
+            sentMain = true;
+        } catch (error) {
+            console.error('Failed to send main report via Send Now:', error.message);
+        }
+    }
+
+    // 2. Send branch-specific reports
+    const { BRANCHES } = require('../utils/constants');
+    for (const branch of BRANCHES) {
+        const branchGroupId = await bot.getBranchGroupId(branch.name);
+        if (branchGroupId) {
+            try {
+                const report = await bot.buildDailyReportForBranch(branch.name);
+                await runningBot.telegram.sendMessage(branchGroupId, report);
+
+                // Set last_report_date_${branchKey}
+                const branchKey = branch.name.toLowerCase().replace(/\s+/g, '_');
+                const stateKey = `last_report_date_${branchKey}`;
+                await Setting.findOneAndUpdate(
+                    { key: stateKey },
+                    { value: today, updated_at: new Date() },
+                    { upsert: true }
+                );
+                sentBranches.push(branch.name);
+            } catch (error) {
+                console.error(`Failed to send branch report for ${branch.name} via Send Now:`, error.message);
+            }
+        }
+    }
+
+    if (!sentMain && sentBranches.length === 0) {
+        return res.status(400).json({ message: 'No valid Telegram Group ID configured for main group or active branches.' });
+    }
+
+    res.json({
+        message: 'Daily report(s) sent successfully',
+        main: sentMain,
+        branches: sentBranches
+    });
+});
