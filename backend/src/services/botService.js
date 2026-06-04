@@ -605,8 +605,24 @@ const sendNotification = async (user, order, buildHeader) => {
 
         // Message 1: notification header (always new)
         await sendToGroups(runningBot, mainGroupId, branchGroupId, header);
+
         // Message 2: full updated report (replaces old report)
-        await sendReportToGroups(runningBot, mainGroupId, branchGroupId, report);
+        // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
+        const inBranchWindow = user.branch ? await isBranchOrderingAllowed(user.branch) : false;
+        const inGlobalWindow = await isOrderingAllowed();
+
+        if (branchGroupId && !inBranchWindow) {
+            await replaceGroupMessage(runningBot, branchGroupId, report);
+        } else if (branchGroupId) {
+            console.log(`[Notification] Skipped daily report update for branch group ${branchGroupId} during ordering window.`);
+        }
+
+        if (mainGroupId && mainGroupId !== branchGroupId && !inGlobalWindow) {
+            await replaceGroupMessage(runningBot, mainGroupId, report);
+        } else if (mainGroupId && mainGroupId !== branchGroupId) {
+            console.log(`[Notification] Skipped daily report update for main group ${mainGroupId} during ordering window.`);
+        }
+
         return true;
     } catch (error) {
         console.error('Notification error:', error.message);
@@ -659,8 +675,23 @@ const sendBranchUpdateNotification = async (user, order, oldBranch = null) => {
         for (const gid of groupsToNotify) {
             // Message 1: notification header (always new)
             await runningBot.telegram.sendMessage(gid, header);
+
             // Message 2: full updated report (replaces old report)
-            await replaceGroupMessage(runningBot, gid, fullReport);
+            // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
+            let inWindow = false;
+            if (gid === mainGroupId) {
+                inWindow = await isOrderingAllowed();
+            } else if (gid === newBranchGroupId && user.branch) {
+                inWindow = await isBranchOrderingAllowed(user.branch);
+            } else if (gid === oldBranchGroupId && oldBranch) {
+                inWindow = await isBranchOrderingAllowed(oldBranch);
+            }
+
+            if (!inWindow) {
+                await replaceGroupMessage(runningBot, gid, fullReport);
+            } else {
+                console.log(`[Notification] Skipped daily report update for group ${gid} during ordering window.`);
+            }
         }
 
         return true;
@@ -705,12 +736,18 @@ const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
 
     // 1. Re-send main group report
     if (mainGroupId && await hasReportBeenSent(orderDate)) {
-        try {
-            const report = await buildDailyReport(orderDate);
-            await replaceGroupMessage(runningBot, mainGroupId, report);
-            console.log(`Sent updated main report for date ${orderDate} to group ${mainGroupId}`);
-        } catch (error) {
-            console.error('Error sending main report update:', error.message);
+        // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
+        const inWindow = await isOrderingAllowed();
+        if (!inWindow) {
+            try {
+                const report = await buildDailyReport(orderDate);
+                await replaceGroupMessage(runningBot, mainGroupId, report);
+                console.log(`Sent updated main report for date ${orderDate} to group ${mainGroupId}`);
+            } catch (error) {
+                console.error('Error sending main report update:', error.message);
+            }
+        } else {
+            console.log(`[ReportUpdate] Skipped main report update because current time is in the ordering window.`);
         }
     }
 
@@ -718,12 +755,18 @@ const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
     if (user?.branch) {
         const newBranchGroupId = await getBranchGroupId(user.branch);
         if (newBranchGroupId && newBranchGroupId !== mainGroupId && await hasReportBeenSent(orderDate, user.branch)) {
-            try {
-                const report = await buildDailyReportForBranch(user.branch, orderDate);
-                await replaceGroupMessage(runningBot, newBranchGroupId, report);
-                console.log(`Sent updated report for branch ${user.branch} to group ${newBranchGroupId}`);
-            } catch (error) {
-                console.error(`Error sending branch report update for ${user.branch}:`, error.message);
+            // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
+            const inWindow = await isBranchOrderingAllowed(user.branch);
+            if (!inWindow) {
+                try {
+                    const report = await buildDailyReportForBranch(user.branch, orderDate);
+                    await replaceGroupMessage(runningBot, newBranchGroupId, report);
+                    console.log(`Sent updated report for branch ${user.branch} to group ${newBranchGroupId}`);
+                } catch (error) {
+                    console.error(`Error sending branch report update for ${user.branch}:`, error.message);
+                }
+            } else {
+                console.log(`[ReportUpdate] Skipped branch report update for ${user.branch} because it is in the ordering window.`);
             }
         }
     }
@@ -732,12 +775,18 @@ const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
     if (oldBranch && oldBranch !== user?.branch) {
         const oldBranchGroupId = await getBranchGroupId(oldBranch);
         if (oldBranchGroupId && oldBranchGroupId !== mainGroupId && await hasReportBeenSent(orderDate, oldBranch)) {
-            try {
-                const report = await buildDailyReportForBranch(oldBranch, orderDate);
-                await replaceGroupMessage(runningBot, oldBranchGroupId, report);
-                console.log(`Sent updated report for old branch ${oldBranch} to group ${oldBranchGroupId}`);
-            } catch (error) {
-                console.error(`Error sending report update for old branch ${oldBranch}:`, error.message);
+            // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
+            const inWindow = await isBranchOrderingAllowed(oldBranch);
+            if (!inWindow) {
+                try {
+                    const report = await buildDailyReportForBranch(oldBranch, orderDate);
+                    await replaceGroupMessage(runningBot, oldBranchGroupId, report);
+                    console.log(`Sent updated report for old branch ${oldBranch} to group ${oldBranchGroupId}`);
+                } catch (error) {
+                    console.error(`Error sending report update for old branch ${oldBranch}:`, error.message);
+                }
+            } else {
+                console.log(`[ReportUpdate] Skipped old branch report update for ${oldBranch} because it is in the ordering window.`);
             }
         }
     }
