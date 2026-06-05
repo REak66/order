@@ -473,11 +473,11 @@ const sendDailyReport = async () => {
 };
 
 /**
- * Generic helper: runs `action(groupId)` if the current local time matches
+ * Generic helper: runs `action(groupId)` if the current local time is at or after
  * `settingMinutes` and the state key has not been set to `today`.
  */
 const runIfDueToday = async (settingMinutes, stateKey, today, action) => {
-    if (settingMinutes === null || getLocalMinutes() !== settingMinutes) return;
+    if (settingMinutes === null || getLocalMinutes() < settingMinutes) return;
     const lastSent = await getPersistentState(stateKey);
     if (lastSent === today) return;
     await action();
