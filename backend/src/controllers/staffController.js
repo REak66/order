@@ -83,7 +83,7 @@ exports.updateStaff = asyncHandler(async (req, res) => {
     const staff = await User.findByIdAndUpdate(
         id,
         updateData,
-        { new: true }
+        { returnDocument: 'after' }
     );
     res.json(staff);
 });

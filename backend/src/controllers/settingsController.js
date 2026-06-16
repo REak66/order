@@ -167,7 +167,7 @@ exports.sendReportNow = asyncHandler(async (req, res) => {
             await Setting.findOneAndUpdate(
                 { key: 'last_report_date' },
                 { value: today, updated_at: new Date() },
-                { upsert: true }
+                { upsert: true, returnDocument: 'after' }
             );
             sentMain = true;
         } catch (error) {
@@ -190,7 +190,7 @@ exports.sendReportNow = asyncHandler(async (req, res) => {
                 await Setting.findOneAndUpdate(
                     { key: stateKey },
                     { value: today, updated_at: new Date() },
-                    { upsert: true }
+                    { upsert: true, returnDocument: 'after' }
                 );
                 sentBranches.push(branch.name);
             } catch (error) {

@@ -111,7 +111,7 @@ exports.placeOrder = asyncHandler(async (req, res) => {
     const order = await Order.findOneAndUpdate(
         { user: userId, order_date: lunchDate },
         { status: 'ordered', created_at: new Date() },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
     );
 
     // Send Telegram notification (non-blocking)
@@ -141,7 +141,7 @@ exports.cancelOrder = asyncHandler(async (req, res) => {
     const order = await Order.findOneAndUpdate(
         { user: userId, order_date: lunchDate },
         { status: 'cancelled' },
-        { new: true }
+        { returnDocument: 'after' }
     );
 
     if (!order) {
@@ -177,7 +177,7 @@ exports.updateBranch = asyncHandler(async (req, res) => {
     }
     const oldBranch = existingStaff.branch;
 
-    const staff = await User.findByIdAndUpdate(userId, { branch }, { new: true });
+    const staff = await User.findByIdAndUpdate(userId, { branch }, { returnDocument: 'after' });
 
     // If staff has an active order for today, send Telegram notification about the branch update
     const lunchDate = getLunchDate();
@@ -203,7 +203,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
     const staff = await User.findByIdAndUpdate(
         userId,
         { password: hashedPassword, is_first_login: false },
-        { new: true }
+        { returnDocument: 'after' }
     );
 
     if (!staff) {

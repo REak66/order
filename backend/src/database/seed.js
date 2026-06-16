@@ -49,7 +49,7 @@ const seedData = async () => {
             await Setting.findOneAndUpdate(
                 { key: setting.key },
                 { $set: setting },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
         }
         console.log('Settings seeded/updated.');

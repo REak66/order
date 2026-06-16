@@ -28,7 +28,7 @@ if (!groupId || !messageId) {
     await Setting.findOneAndUpdate(
         { key },
         { value: String(messageId), updated_at: new Date() },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
     );
     console.log(`✅ Stored: key="${key}" → messageId="${messageId}"`);
     console.log('   The next report update will now delete that old message.');

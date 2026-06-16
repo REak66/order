@@ -70,7 +70,7 @@ const setPersistentState = async (key, value) => {
         await Setting.findOneAndUpdate(
             { key },
             { value, updated_at: new Date() },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
     } catch (error) {
         console.error(`Error writing persistent state for key ${key}:`, error.message);
@@ -506,7 +506,18 @@ const replaceGroupMessage = async (
             await runningBot.telegram.deleteMessage(groupId, Number(lastMsgId));
             console.log(`[replace] Deleted old message ${lastMsgId} in group ${groupId}`);
         } catch (err) {
-            console.warn(`[replace] Could not delete msg ${lastMsgId} in ${groupId}:`, err.message);
+            // If the message is already gone (deleted by someone else or expired),
+            // clear the stale ID so future sends don't retry the same bad reference.
+            const isStale = err.message && (
+                err.message.includes('message to delete not found') ||
+                err.message.includes('MESSAGE_ID_INVALID')
+            );
+            if (isStale) {
+                console.warn(`[replace] Stale msg ${lastMsgId} in ${groupId} — clearing stored ID.`);
+                await setPersistentState(stateKey, '');
+            } else {
+                console.warn(`[replace] Could not delete msg ${lastMsgId} in ${groupId}:`, err.message);
+            }
         }
     } else {
         console.log(`[replace] No previous message stored for group ${groupId}, sending fresh.`);

@@ -98,14 +98,14 @@ const initDatabase = async () => {
                     await Setting.findOneAndUpdate(
                         { key: 'bot_token' },
                         { value: setting.value },
-                        { upsert: true }
+                        { upsert: true, returnDocument: 'after' }
                     );
                 }
             } else {
                 await Setting.findOneAndUpdate(
                     { key: setting.key },
                     { $setOnInsert: setting },
-                    { upsert: true }
+                    { upsert: true, returnDocument: 'after' }
                 );
             }
         }
