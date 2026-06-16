@@ -6,7 +6,11 @@ import {
   Clock,
   Lock,
   KeyRound,
-  Send
+  Send,
+  Bell,
+  FileText,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +32,13 @@ const Settings = () => {
     order_end_time: '',
     report_time: '',
     supply_bot_token: '',
-    supply_group_id: ''
+    supply_group_id: '',
+    supply_report_time: '',
+    supply_custom_message: '',
+    lunch_reminder_enabled: 'false',
+    lunch_reminder_time: '15:00',
+    lunch_reminder_message_en: '',
+    lunch_reminder_message_kh: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,14 +55,20 @@ const Settings = () => {
     { id: 'global', name: 'Global Settings' },
     { id: 'byd_6a', name: 'BYD 6A' },
     { id: 'city_mall', name: 'City Mall' },
-    { id: 'byd_60m', name: 'BYD 60M' },
-    { id: 'supply', name: 'Supplier' }
+    { id: 'supply', name: 'Supplier' },
+    { id: 'reminder', name: 'Reminder' }
   ];
 
   useEffect(() => {
     fetchSettings();
     fetchAccounts();
   }, [admin]);
+
+  useEffect(() => {
+    if (activeTab === 'reminder') {
+      fetchReminderLogs(1);
+    }
+  }, [activeTab]);
 
   const fetchSettings = async () => {
     try {
@@ -117,6 +133,11 @@ const Settings = () => {
 
   const [sendingReport, setSendingReport] = useState(false);
   const [sendingSupply, setSendingSupply] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [reminderLogs, setReminderLogs] = useState([]);
+  const [reminderLogsPage, setReminderLogsPage] = useState(1);
+  const [reminderLogsTotalPages, setReminderLogsTotalPages] = useState(1);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   const handleSendToSupply = async () => {
     setSendingSupply(true);
@@ -144,6 +165,34 @@ const Settings = () => {
       toast.error(msg);
     } finally {
       setSendingReport(false);
+    }
+  };
+
+  const handleSendLunchReminder = async () => {
+    setSendingReminder(true);
+    try {
+      const res = await api.post('/api/settings/send-lunch-reminder');
+      toast.success(res.data.message || 'Lunch reminder sent!');
+      fetchReminderLogs(1);
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Failed to send lunch reminder';
+      toast.error(msg);
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
+  const fetchReminderLogs = async (page = 1) => {
+    setLoadingLogs(true);
+    try {
+      const res = await api.get(`/api/settings/reminder-logs?page=${page}&limit=10`);
+      setReminderLogs(res.data.logs);
+      setReminderLogsPage(res.data.page);
+      setReminderLogsTotalPages(res.data.totalPages);
+    } catch (error) {
+      console.error('Failed to fetch reminder logs:', error);
+    } finally {
+      setLoadingLogs(false);
     }
   };
 
@@ -219,11 +268,10 @@ const Settings = () => {
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap outline-none cursor-pointer ${
-              activeTab === tab.id
-                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
-            }`}
+            className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap outline-none cursor-pointer ${activeTab === tab.id
+              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+              : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
+              }`}
           >
             {tab.name}
           </button>
@@ -307,7 +355,7 @@ const Settings = () => {
           </div>
         )}
 
-        {activeTab !== 'global' && activeTab !== 'supply' && (
+        {activeTab !== 'global' && activeTab !== 'supply' && activeTab !== 'reminder' && (
           <div className="space-y-6 motion-preset-fade motion-duration-200">
             {/* Override Toggle */}
             <div className="flex items-center justify-between p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
@@ -460,6 +508,54 @@ const Settings = () => {
               </div>
             </div>
 
+            {/* Supply Schedule Config */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <Clock className="text-emerald-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Auto Send Schedule</h3>
+              </div>
+              <div className="p-4 sm:p-6 space-y-4">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Set a time to automatically send the supplier order summary daily. Leave empty to disable auto-send.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Auto Send Time</label>
+                    <TimePicker
+                      value={settings.supply_report_time}
+                      onChange={(e) => setSettings({ ...settings, supply_report_time: e.target.value })}
+                    />
+                    <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">
+                      {settings.supply_report_time ? `Auto-send enabled at ${settings.supply_report_time}` : 'Disabled — use manual "Send to Supplier" button'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Supply Customize Message */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <FileText className="text-emerald-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Customize Message</h3>
+              </div>
+              <div className="p-4 sm:p-6 space-y-4">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Add an optional note from the admin that will be appended at the bottom of the supplier order summary. Leave empty to omit.
+                </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Admin Note</label>
+                  <textarea
+                    rows={3}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition text-slate-800 dark:text-slate-200 resize-none"
+                    placeholder={"e.g. Please prepare by 11:00 AM. Thank you!"}
+                    value={settings.supply_custom_message}
+                    onChange={(e) => setSettings({ ...settings, supply_custom_message: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Supply Message Preview */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
@@ -467,16 +563,213 @@ const Settings = () => {
                 <h3 className="font-bold text-slate-800 dark:text-white">Message Preview</h3>
               </div>
               <div className="p-4 sm:p-6">
-                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 font-mono text-sm text-slate-700 dark:text-slate-300 space-y-1 border border-slate-100 dark:border-slate-700">
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 font-mono text-sm text-slate-700 dark:text-slate-300 space-y-1 border border-slate-100 dark:border-slate-700 whitespace-pre-wrap">
                   <p>📦 Supplier Order Summary</p>
                   <p>📅 Date: DD/MM/YYYY</p>
                   <p>&nbsp;</p>
-                  <p>📍6A order = total(6A) pcs</p>
-                  <p>📍CityMall order = total(CityMall) pcs</p>
-                  <p>📍60M order = total(60M) pcs</p>
+                  <p>📍6A order = total(6A) pcs <span className="text-emerald-500">(Management x N)</span></p>
+                  <p>📍CityMall order = total(CityMall) pcs <span className="text-emerald-500">(Management x N)</span></p>
+                  <p>📍60M order = total(60M) pcs <span className="text-emerald-500">(Management x N)</span></p>
                   <p>&nbsp;</p>
                   <p>📊 Total order = Total(all branch) pcs</p>
+                  {settings.supply_custom_message?.trim() && (
+                    <>
+                      <p>&nbsp;</p>
+                      <p className="text-emerald-600 dark:text-emerald-400">📝 {settings.supply_custom_message.trim()}</p>
+                    </>
+                  )}
                 </div>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+                  <span className="text-emerald-500 font-semibold">Management</span> = staff with "Manager" in position (e.g. Technician Manager), excluding Department Manager.
+                  Only shown when count &gt; 0.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'reminder' && (
+          <div className="space-y-8 motion-preset-fade motion-duration-200">
+            {/* Enable/Disable Toggle */}
+            <div className="flex items-center justify-between p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+              <div>
+                <h4 className="font-bold text-slate-800 dark:text-white">Auto Lunch Order Reminder</h4>
+                <p className="text-slate-500 text-xs mt-0.5">Automatically send a lunch order reminder message to Telegram groups at the configured time</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={settings.lunch_reminder_enabled === 'true'}
+                  onChange={(e) => {
+                    setSettings({
+                      ...settings,
+                      lunch_reminder_enabled: e.target.checked ? 'true' : 'false'
+                    });
+                  }}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
+
+            {/* Schedule Config */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <Clock className="text-amber-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Reminder Schedule</h3>
+              </div>
+              <div className="p-4 sm:p-6 space-y-4">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Set the time to automatically send the lunch order reminder daily. The reminder will be sent to all configured Telegram groups.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Send Time</label>
+                    <TimePicker
+                      value={settings.lunch_reminder_time}
+                      onChange={(e) => setSettings({ ...settings, lunch_reminder_time: e.target.value })}
+                    />
+                    <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">
+                      {settings.lunch_reminder_enabled === 'true'
+                        ? `Auto-send enabled at ${settings.lunch_reminder_time || '15:00'}`
+                        : 'Auto-send disabled \u2014 enable the toggle above'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Message Editor */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <FileText className="text-amber-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Reminder Message</h3>
+              </div>
+              <div className="p-4 sm:p-6 space-y-6">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Customize the reminder message in both English and Khmer. Leave empty to use the default messages.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">English Message</label>
+                    <textarea
+                      rows={4}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none"
+                      placeholder={"Hello everyone,\n\nPlease place your lunch order for tomorrow. Thank you!"}
+                      value={settings.lunch_reminder_message_en}
+                      onChange={(e) => setSettings({ ...settings, lunch_reminder_message_en: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Khmer Message</label>
+                    <textarea
+                      rows={4}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none"
+                      placeholder={"\u179f\u17bd\u179f\u17d2\u178f\u17b8\u17a2\u17d2\u1793\u1780\u1791\u17b6\u17c6\u1784\u17a2\u179f\u17cb\u1782\u17d2\u1793\u17b6 \u179f\u17bc\u1798\u1792\u17d2\u179c\u17be\u1780\u17b6\u179a\u1780\u1798\u17d2\u1798\u1784\u17cb\u17a2\u17b6\u17a0\u17b6\u179a\u1790\u17d2\u1784\u17c3\u178f\u17d2\u179a\u1784\u17cb\u179f\u1798\u17d2\u179a\u17b6\u1794\u17cb\u1790\u17d2\u1784\u17c3\u179f\u17d2\u17a2\u17c2\u1780\u17d4 \u17a2\u179a\u1782\u17bb\u178e!\ud83d\ude18"}
+                      value={settings.lunch_reminder_message_kh}
+                      onChange={(e) => setSettings({ ...settings, lunch_reminder_message_kh: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Message Preview */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <Bell className="text-amber-500" size={20} />
+                <h3 className="font-bold text-slate-800 dark:text-white">Message Preview</h3>
+              </div>
+              <div className="p-4 sm:p-6">
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 font-mono text-sm text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700 whitespace-pre-wrap">
+                  {(settings.lunch_reminder_message_en?.trim() || 'Hello everyone,\n\nPlease place your lunch order for tomorrow. Thank you!')}
+                  {'\n\n'}
+                  {(settings.lunch_reminder_message_kh?.trim() || '\u179f\u17bd\u179f\u17d2\u178f\u17b8\u17a2\u17d2\u1793\u1780\u1791\u17b6\u17c6\u1784\u17a2\u179f\u17cb\u1782\u17d2\u1793\u17b6 \u179f\u17bc\u1798\u1792\u17d2\u179c\u17be\u1780\u17b6\u179a\u1780\u1798\u17d2\u1798\u1784\u17cb\u17a2\u17b6\u17a0\u17b6\u179a\u1790\u17d2\u1784\u17c3\u178f\u17d2\u179a\u1784\u17cb\u179f\u1798\u17d2\u179a\u17b6\u1794\u17cb\u1790\u17d2\u1784\u17c3\u179f\u17d2\u17a2\u17c2\u1780\u17d4 \u17a2\u179a\u1782\u17bb\u178e!\ud83d\ude18')}
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+                  This is how the message will appear in Telegram. Both languages are combined into a single message.
+                </p>
+              </div>
+            </div>
+
+            {/* Audit Log */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="text-amber-500" size={20} />
+                  <h3 className="font-bold text-slate-800 dark:text-white">Sent Reminders Log</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchReminderLogs(1)}
+                  className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 font-semibold cursor-pointer"
+                >
+                  Refresh
+                </button>
+              </div>
+              <div className="p-4 sm:p-6">
+                {reminderLogs.length === 0 && !loadingLogs ? (
+                  <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-6">No reminders sent yet. Use &quot;Send Now&quot; or enable auto-send to get started.</p>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                            <th className="pb-3 pr-4 font-semibold">Date & Time</th>
+                            <th className="pb-3 pr-4 font-semibold">Group</th>
+                            <th className="pb-3 font-semibold">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                          {reminderLogs.map((log, i) => (
+                            <tr key={log._id || i} className="text-slate-700 dark:text-slate-300">
+                              <td className="py-2.5 pr-4 whitespace-nowrap text-xs font-mono">
+                                {new Date(log.sent_at).toLocaleString('en-US', {
+                                  year: 'numeric', month: 'short', day: '2-digit',
+                                  hour: '2-digit', minute: '2-digit', hour12: true
+                                })}
+                              </td>
+                              <td className="py-2.5 pr-4 whitespace-nowrap text-xs font-semibold">{log.group_label}</td>
+                              <td className="py-2.5 whitespace-nowrap">
+                                {log.status === 'success' ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                    <CheckCircle2 size={14} /> Sent
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 dark:text-rose-400" title={log.error_message}>
+                                    <AlertCircle size={14} /> Error
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {reminderLogsTotalPages > 1 && (
+                      <div className="flex items-center justify-between pt-2">
+                        <button
+                          type="button"
+                          disabled={reminderLogsPage <= 1 || loadingLogs}
+                          onClick={() => fetchReminderLogs(reminderLogsPage - 1)}
+                          className="text-xs font-semibold text-amber-600 hover:text-amber-700 dark:text-amber-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          &larr; Previous
+                        </button>
+                        <span className="text-xs text-slate-400">Page {reminderLogsPage} of {reminderLogsTotalPages}</span>
+                        <button
+                          type="button"
+                          disabled={reminderLogsPage >= reminderLogsTotalPages || loadingLogs}
+                          onClick={() => fetchReminderLogs(reminderLogsPage + 1)}
+                          className="text-xs font-semibold text-amber-600 hover:text-amber-700 dark:text-amber-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          Next &rarr;
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -499,7 +792,23 @@ const Settings = () => {
             </button>
           )}
 
-          {activeTab !== 'supply' && (
+          {activeTab === 'reminder' && (
+            <button
+              type="button"
+              disabled={sendingReminder || saving}
+              onClick={handleSendLunchReminder}
+              className="flex items-center gap-2 px-8 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendingReminder ? 'Sending...' : (
+                <>
+                  <Bell size={20} />
+                  <span>Send Reminder Now</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {activeTab !== 'supply' && activeTab !== 'reminder' && (
             <button
               type="button"
               disabled={sendingReport || saving}

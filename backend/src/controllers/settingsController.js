@@ -1,4 +1,5 @@
 const Setting = require('../models/Setting');
+const ReminderLog = require('../models/ReminderLog');
 const bot = require('../services/botService');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -9,7 +10,13 @@ const DEFAULT_SETTINGS = {
     order_end_time: '16:00',
     report_time: '16:20',
     supply_bot_token: '',
-    supply_group_id: ''
+    supply_group_id: '',
+    supply_report_time: '',
+    lunch_reminder_enabled: 'false',
+    lunch_reminder_time: '15:00',
+    lunch_reminder_message_en: '',
+    lunch_reminder_message_kh: '',
+    supply_custom_message: ''
 };
 
 const TIME_SETTING_KEYS = ['order_start_time', 'order_end_time', 'report_time'];
@@ -115,6 +122,20 @@ exports.updateSettings = asyncHandler(async (req, res) => {
         }
     }
 
+    // If supply_report_time was changed, clear last_supply_report_date to allow re-triggering
+    const oldSupplyReportTime = existingSettings.find(s => s.key === 'supply_report_time')?.value || '';
+    if (settings.supply_report_time !== undefined && settings.supply_report_time !== oldSupplyReportTime) {
+        await Setting.deleteOne({ key: 'last_supply_report_date' });
+        console.log(`Cleared last_supply_report_date because supply_report_time changed from ${oldSupplyReportTime} to ${settings.supply_report_time}`);
+    }
+
+    // If lunch_reminder_time was changed, clear last_lunch_reminder_date to allow re-triggering
+    const oldLunchReminderTime = existingSettings.find(s => s.key === 'lunch_reminder_time')?.value || '';
+    if (settings.lunch_reminder_time !== undefined && settings.lunch_reminder_time !== oldLunchReminderTime) {
+        await Setting.deleteOne({ key: 'last_lunch_reminder_date' });
+        console.log(`Cleared last_lunch_reminder_date because lunch_reminder_time changed from ${oldLunchReminderTime} to ${settings.lunch_reminder_time}`);
+    }
+
     if (shouldRestartBot) {
         bot.restart().catch(error => {
             console.error('Bot restart error:', error.message);
@@ -190,10 +211,7 @@ exports.sendReportNow = asyncHandler(async (req, res) => {
 });
 exports.sendToSupply = asyncHandler(async (req, res) => {
     const { Telegraf } = require('telegraf');
-    const Order = require('../models/Order');
-    const User = require('../models/User');
-    const { BRANCHES } = require('../utils/constants');
-    const { toLocalIsoDate, getLunchDate } = require('../utils/dateUtils');
+    const { getLunchDate } = require('../utils/dateUtils');
 
     // Load supply settings
     const supplyBotTokenRow = await Setting.findOne({ key: 'supply_bot_token' });
@@ -209,39 +227,63 @@ exports.sendToSupply = asyncHandler(async (req, res) => {
         return res.status(400).json({ message: 'Supply Group ID is not configured or invalid.' });
     }
 
-    // Use the lunch date (same as buildDailyReport) — orders placed today are for tomorrow's lunch
+    // Use the shared builder from botService
     const orderDate = getLunchDate();
-    const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
-    const orderedUserIds = new Set(orders.map(o => o.user.toString()));
-
-    const users = await User.find({});
-    const isOrdered = (user) => orderedUserIds.has(user._id.toString());
-
-    // Build per-branch totals
-    const branchTotals = BRANCHES.map(branch => ({
-        label: branch.reportLabel,
-        count: users.filter(u => u.branch === branch.name && isOrdered(u)).length
-    }));
-    const totalAll = branchTotals.reduce((sum, b) => sum + b.count, 0);
-
-    // Format date as DD/MM/YYYY
-    const [year, month, day] = orderDate.split('-');
-    const displayDate = `${day}/${month}/${year}`;
-
-    let message = `📦 Supplier Order Summary\n`;
-    message += `📅 Date: ${displayDate}\n\n`;
-    for (const b of branchTotals) {
-        message += `📍${b.label} order = ${b.count} pcs\n`;
-    }
-    message += `\n📊 Total order = ${totalAll} pcs`;
+    const message = await bot.buildSupplyOrderSummary(orderDate);
 
     try {
         const supplyBot = new Telegraf(supplyBotToken);
-        await supplyBot.telegram.sendMessage(supplyGroupId, message);
+        await bot.replaceGroupMessage(
+            supplyBot,
+            supplyGroupId,
+            message,
+            null,
+            'last_supply_message_id'
+        );
     } catch (error) {
         console.error('Failed to send supply message:', error.message);
         return res.status(500).json({ message: 'Failed to send message to supply group: ' + error.message });
     }
 
     res.json({ message: 'Supplier order summary sent successfully!' });
+});
+
+exports.sendLunchReminderNow = asyncHandler(async (req, res) => {
+    const result = await bot.sendLunchReminderNow();
+
+    if (!result.success) {
+        return res.status(400).json({ message: result.error });
+    }
+
+    const parts = [];
+    if (result.sentGroups.length > 0) {
+        parts.push(`Sent to: ${result.sentGroups.join(', ')}`);
+    }
+    if (result.errors.length > 0) {
+        parts.push(`Errors: ${result.errors.join('; ')}`);
+    }
+
+    res.json({
+        message: parts.join('. ') || 'Lunch reminder sent!',
+        sentGroups: result.sentGroups,
+        errors: result.errors
+    });
+});
+
+exports.getReminderLogs = asyncHandler(async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [logs, total] = await Promise.all([
+        ReminderLog.find().sort({ sent_at: -1 }).skip(skip).limit(limit),
+        ReminderLog.countDocuments()
+    ]);
+
+    res.json({
+        logs,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
+    });
 });

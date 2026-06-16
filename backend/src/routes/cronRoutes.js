@@ -94,6 +94,22 @@ router.get('/tick', verifyCron, async (req, res) => {
             results.report = `error: ${e.message}`;
         }
         
+        // Run supply report auto-send
+        try {
+            await botService.sendSupplyReportIfDue();
+            results.supplyReport = 'success';
+        } catch (e) {
+            results.supplyReport = `error: ${e.message}`;
+        }
+        
+        // Run lunch order reminder
+        try {
+            await botService.sendLunchReminderIfDue();
+            results.lunchReminder = 'success';
+        } catch (e) {
+            results.lunchReminder = `error: ${e.message}`;
+        }
+        
         return res.json({ success: true, results });
     } catch (error) {
         console.error('[Cron] Tick failed:', error.message);

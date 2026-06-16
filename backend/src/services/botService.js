@@ -3,6 +3,7 @@ const cron = require('node-cron');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Setting = require('../models/Setting');
+const ReminderLog = require('../models/ReminderLog');
 const { BRANCHES, SYMBOLS, BRANCH_ALIASES } = require('../utils/constants');
 const {
     TIME_ZONE,
@@ -40,6 +41,9 @@ const FULL_CHAT_PERMISSIONS = {
 };
 
 const REPORT_FOOTER = 'ប្រសិនបើមិនឃើញឈ្មោះរបស់អ្នកសូមទាក់ទង់មកកាន់ @SreyNeang2701 និង @Thaivouchkim សូមអរគុណ!!!';
+
+const DEFAULT_LUNCH_REMINDER_EN = 'Hello everyone,\n\nPlease place your lunch order for tomorrow. Thank you!';
+const DEFAULT_LUNCH_REMINDER_KH = 'សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!😘';
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
@@ -285,6 +289,63 @@ const buildDailyReportForBranch = async (branchName, date = new Date()) => {
     return report.trim();
 };
 
+/**
+ * Checks whether a user's position qualifies as "Management".
+ * Matches any position containing "Manager" (case-insensitive)
+ * but excludes "Department Manager" specifically.
+ * Also matches "CEO".
+ */
+const isManagementPosition = (position) => {
+    if (!position) return false;
+    if (/\bceo\b/i.test(position)) return true;
+    return /manager/i.test(position) && !/^department\s+manager$/i.test(position);
+};
+
+/**
+ * Builds the Supplier Order Summary message with Management counts.
+ * Shared between the manual "Send to Supply" button and the auto-send cron.
+ */
+const buildSupplyOrderSummary = async (orderDate) => {
+    const users = await User.find({});
+    const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
+    const orderedUserIds = new Set(orders.map(o => o.user.toString()));
+    const isOrdered = (user) => orderedUserIds.has(user._id.toString());
+
+    const branchTotals = BRANCHES.map(branch => {
+        const orderedUsers = users.filter(u => u.branch === branch.name && isOrdered(u));
+        const managementCount = orderedUsers.filter(u => isManagementPosition(u.position)).length;
+        return {
+            label: branch.reportLabel,
+            count: orderedUsers.length,
+            managementCount
+        };
+    });
+    const totalAll = branchTotals.reduce((sum, b) => sum + b.count, 0);
+
+    // Format date as DD/MM/YYYY
+    const [year, month, day] = orderDate.split('-');
+    const displayDate = `${day}/${month}/${year}`;
+
+    let message = `📦 Supplier Order Summary\n`;
+    message += `📅 Date: ${displayDate}\n\n`;
+    for (const b of branchTotals) {
+        message += `📍${b.label} order = ${b.count} pcs`;
+        if (b.managementCount > 0) {
+            message += ` (Management x ${b.managementCount})`;
+        }
+        message += `\n`;
+    }
+    message += `\n📊 Total order = ${totalAll} pcs`;
+
+    // Append admin custom note if configured
+    const customNote = (await getSettingValue('supply_custom_message'))?.trim();
+    if (customNote) {
+        message += `\n\n📝 ${customNote}`;
+    }
+
+    return message;
+};
+
 // ─── Bot Lifecycle ────────────────────────────────────────────────────────────
 
 const getRunningBot = async () => {
@@ -431,8 +492,13 @@ const syncGroupMuteState = async () => {
  * Deletes the previously stored report message for a group (if any),
  * then sends a new message and persists the new message_id.
  */
-const replaceGroupMessage = async (runningBot, groupId, text, parseMode = null) => {
-    const stateKey = `last_msg_id_${groupId}`;
+const replaceGroupMessage = async (
+    runningBot,
+    groupId,
+    text,
+    parseMode = null,
+    stateKey = `last_msg_id_${groupId}`
+) => {
     const lastMsgId = await getPersistentState(stateKey);
 
     if (lastMsgId) {
@@ -556,6 +622,182 @@ const sendOrderReminderIfDue = async () => {
             console.log(`Sent main order reminder to group ${mainGroupId}`);
         });
     }
+};
+
+/**
+ * Auto-sends the Supplier Order Summary if the configured supply_report_time
+ * has been reached and it hasn't been sent today yet.
+ */
+const sendSupplyReportIfDue = async () => {
+    const supplyReportTime = await getSettingValue('supply_report_time');
+    if (!supplyReportTime) return; // auto-send disabled
+
+    const settingMinutes = parseTimeToMinutes(supplyReportTime);
+    if (settingMinutes === null) return;
+
+    const today = toLocalIsoDate();
+
+    await runIfDueToday(settingMinutes, 'last_supply_report_date', today, async () => {
+        const { Telegraf } = require('telegraf');
+
+        const supplyBotToken = (await getSettingValue('supply_bot_token'))?.trim();
+        const supplyGroupId = (await getSettingValue('supply_group_id'))?.trim();
+
+        if (!supplyBotToken || !supplyGroupId || !/^-?\d+$/.test(supplyGroupId)) {
+            console.warn('[SupplyAutoSend] Supply bot token or group ID not configured. Skipping.');
+            return;
+        }
+
+        const orderDate = getLunchDate();
+        const message = await buildSupplyOrderSummary(orderDate);
+
+        try {
+            const supplyBot = new Telegraf(supplyBotToken);
+            await replaceGroupMessage(
+                supplyBot,
+                supplyGroupId,
+                message,
+                null,
+                'last_supply_message_id'
+            );
+            console.log(`[SupplyAutoSend] Sent supplier order summary to group ${supplyGroupId}`);
+        } catch (error) {
+            console.error('[SupplyAutoSend] Failed to send supply message:', error.message);
+        }
+    });
+};
+
+// ─── Lunch Order Reminder ─────────────────────────────────────────────────────
+
+/**
+ * Builds the lunch reminder message from settings (editable by admin).
+ * Falls back to default English + Khmer messages.
+ */
+const buildLunchReminderMessage = async () => {
+    const enMsg = (await getSettingValue('lunch_reminder_message_en'))?.trim() || DEFAULT_LUNCH_REMINDER_EN;
+    const khMsg = (await getSettingValue('lunch_reminder_message_kh'))?.trim() || DEFAULT_LUNCH_REMINDER_KH;
+    return `${enMsg}\n\n${khMsg}`;
+};
+
+/**
+ * Logs a reminder send attempt to the ReminderLog collection.
+ */
+const logReminder = async (message, groupId, groupLabel, status, errorMessage = '') => {
+    try {
+        await ReminderLog.create({
+            message,
+            group_id: groupId,
+            group_label: groupLabel,
+            sent_at: new Date(),
+            status,
+            error_message: errorMessage
+        });
+    } catch (err) {
+        console.error('[LunchReminder] Failed to log reminder:', err.message);
+    }
+};
+
+/**
+ * Auto-sends the lunch order reminder if the configured lunch_reminder_time
+ * has been reached, the feature is enabled, and it hasn't been sent today.
+ */
+const sendLunchReminderIfDue = async () => {
+    const enabled = await getSettingValue('lunch_reminder_enabled');
+    if (enabled !== 'true') return;
+
+    const reminderTime = await getSettingValue('lunch_reminder_time');
+    if (!reminderTime) return;
+
+    const settingMinutes = parseTimeToMinutes(reminderTime);
+    if (settingMinutes === null) return;
+
+    const today = toLocalIsoDate();
+
+    await runIfDueToday(settingMinutes, 'last_lunch_reminder_date', today, async () => {
+        const runningBot = await getRunningBot();
+        if (!runningBot) {
+            console.warn('[LunchReminder] Bot not running, skipping.');
+            return;
+        }
+
+        const message = await buildLunchReminderMessage();
+
+        // 1. Send to branch-specific groups
+        for (const branch of BRANCHES) {
+            const branchGroupId = await getBranchGroupId(branch.name);
+            if (!branchGroupId) continue;
+
+            try {
+                await runningBot.telegram.sendMessage(branchGroupId, message);
+                await logReminder(message, branchGroupId, branch.name, 'success');
+                console.log(`[LunchReminder] Sent to branch ${branch.name} (${branchGroupId})`);
+            } catch (error) {
+                await logReminder(message, branchGroupId, branch.name, 'error', error.message);
+                console.error(`[LunchReminder] Error sending to branch ${branch.name}:`, error.message);
+            }
+        }
+
+        // 2. Send to main group
+        const mainGroupId = await getGroupId();
+        if (mainGroupId) {
+            try {
+                await runningBot.telegram.sendMessage(mainGroupId, message);
+                await logReminder(message, mainGroupId, 'Main Group', 'success');
+                console.log(`[LunchReminder] Sent to main group (${mainGroupId})`);
+            } catch (error) {
+                await logReminder(message, mainGroupId, 'Main Group', 'error', error.message);
+                console.error(`[LunchReminder] Error sending to main group:`, error.message);
+            }
+        }
+    });
+};
+
+/**
+ * Manually sends the lunch order reminder immediately ("Send Now" button).
+ * Does not check time or the last-sent state key.
+ */
+const sendLunchReminderNow = async () => {
+    const runningBot = await getRunningBot();
+    if (!runningBot) {
+        return { success: false, error: 'Telegram bot is not configured or running.' };
+    }
+
+    const message = await buildLunchReminderMessage();
+    const results = { sentGroups: [], errors: [] };
+
+    // 1. Send to branch-specific groups
+    for (const branch of BRANCHES) {
+        const branchGroupId = await getBranchGroupId(branch.name);
+        if (!branchGroupId) continue;
+
+        try {
+            await runningBot.telegram.sendMessage(branchGroupId, message);
+            await logReminder(message, branchGroupId, branch.name, 'success');
+            results.sentGroups.push(branch.name);
+        } catch (error) {
+            await logReminder(message, branchGroupId, branch.name, 'error', error.message);
+            results.errors.push(`${branch.name}: ${error.message}`);
+        }
+    }
+
+    // 2. Send to main group
+    const mainGroupId = await getGroupId();
+    if (mainGroupId) {
+        try {
+            await runningBot.telegram.sendMessage(mainGroupId, message);
+            await logReminder(message, mainGroupId, 'Main Group', 'success');
+            results.sentGroups.push('Main Group');
+        } catch (error) {
+            await logReminder(message, mainGroupId, 'Main Group', 'error', error.message);
+            results.errors.push(`Main Group: ${error.message}`);
+        }
+    }
+
+    if (results.sentGroups.length === 0 && results.errors.length === 0) {
+        return { success: false, error: 'No Telegram groups configured.' };
+    }
+
+    return { success: true, ...results };
 };
 
 // ─── Notification Helpers ─────────────────────────────────────────────────────
@@ -792,6 +1034,49 @@ const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
     }
 };
 
+// ─── Supply Report Update (after manual order change) ───────────────────────
+
+/**
+ * If the supply auto-send has already fired today for the given orderDate,
+ * rebuild the supplier summary and replace the existing Telegram message (1:1).
+ * Called after every admin manual order add / update / remove.
+ *
+ * @param {string} orderDate - ISO date string of the affected order (e.g. '2025-01-15')
+ */
+const sendSupplyReportUpdate = async (orderDate) => {
+    // Only act on the lunch date that the auto-send covers
+    const lunchDate = getLunchDate();
+    if (orderDate !== lunchDate) return;
+
+    // Check whether the auto-send has already fired today
+    const today = toLocalIsoDate();
+    const lastSent = await getPersistentState('last_supply_report_date');
+    if (lastSent !== today) return; // cron hasn't sent yet – it will pick up fresh data on its own
+
+    const supplyBotToken = (await getSettingValue('supply_bot_token'))?.trim();
+    const supplyGroupId = (await getSettingValue('supply_group_id'))?.trim();
+
+    if (!supplyBotToken || !supplyGroupId || !/^-?\d+$/.test(supplyGroupId)) {
+        console.warn('[SupplyUpdate] Supply bot token or group ID not configured. Skipping.');
+        return;
+    }
+
+    try {
+        const message = await buildSupplyOrderSummary(orderDate);
+        const supplyBot = new Telegraf(supplyBotToken);
+        await replaceGroupMessage(
+            supplyBot,
+            supplyGroupId,
+            message,
+            null,
+            'last_supply_message_id'
+        );
+        console.log(`[SupplyUpdate] Replaced supplier summary for ${orderDate} in group ${supplyGroupId}`);
+    } catch (error) {
+        console.error('[SupplyUpdate] Failed to replace supply message:', error.message);
+    }
+};
+
 // ─── Webhook Middleware (Vercel) ──────────────────────────────────────────────
 
 const handleWebhook = async (req, res, next) => {
@@ -811,6 +1096,8 @@ if (!process.env.VERCEL) {
     cron.schedule('* * * * *', () => sendOrderReminderIfDue(), CRON_OPTS);
     cron.schedule('* * * * *', () => sendDailyReportIfDue(), CRON_OPTS);
     cron.schedule('* * * * *', () => syncGroupMuteState(), CRON_OPTS);
+    cron.schedule('* * * * *', () => sendSupplyReportIfDue(), CRON_OPTS);
+    cron.schedule('* * * * *', () => sendLunchReminderIfDue(), CRON_OPTS);
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
@@ -829,11 +1116,17 @@ module.exports = {
     sendCancellationNotification,
     sendBranchUpdateNotification,
     sendDailyReportUpdate,
+    sendSupplyReportUpdate,
     sendOrderReminderIfDue,
     sendDailyReportIfDue,
+    sendSupplyReportIfDue,
     getBranchSettingValue,
     getGroupId,
     getBranchGroupId,
     isBranchOrderingAllowed,
-    buildDailyReportForBranch
+    buildDailyReportForBranch,
+    buildSupplyOrderSummary,
+    replaceGroupMessage,
+    sendLunchReminderIfDue,
+    sendLunchReminderNow
 };

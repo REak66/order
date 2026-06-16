@@ -7,5 +7,7 @@ router.get('/', authMiddleware, settingsController.getSettings);
 router.post('/', authMiddleware, settingsController.updateSettings);
 router.post('/send-now', authMiddleware, settingsController.sendReportNow);
 router.post('/send-to-supply', authMiddleware, settingsController.sendToSupply);
+router.post('/send-lunch-reminder', authMiddleware, settingsController.sendLunchReminderNow);
+router.get('/reminder-logs', authMiddleware, settingsController.getReminderLogs);
 
 module.exports = router;

@@ -285,6 +285,12 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
       console.error("Failed to send daily report update:", error.message);
     }
 
+    try {
+      await botService.sendSupplyReportUpdate(orderDate);
+    } catch (error) {
+      console.error("Failed to send supply report update:", error.message);
+    }
+
     return res.json({ message: "Manual order cleared", user });
   }
 
@@ -326,6 +332,12 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
     await botService.sendDailyReportUpdate(user, orderDate, oldBranch);
   } catch (error) {
     console.error("Failed to send daily report update:", error.message);
+  }
+
+  try {
+    await botService.sendSupplyReportUpdate(orderDate);
+  } catch (error) {
+    console.error("Failed to send supply report update:", error.message);
   }
 
   res.json({ message: "Manual order saved", order, user });
