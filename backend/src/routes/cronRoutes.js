@@ -8,16 +8,16 @@ const verifyCron = (req, res, next) => {
     if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
         return next();
     }
-    
+
     // Check if the request is made by Vercel Cron system or matches a secret token
     const isVercelCron = req.headers['x-vercel-cron'] === '1';
     const cronSecret = process.env.CRON_SECRET;
     const isSecretMatch = cronSecret && req.headers['authorization'] === `Bearer ${cronSecret}`;
-    
+
     if (isVercelCron || isSecretMatch) {
         return next();
     }
-    
+
     return res.status(401).json({ error: 'Unauthorized: Cron signature or secret missing' });
 };
 
@@ -63,13 +63,13 @@ router.get('/report', verifyCron, async (req, res) => {
 // 4. Combined tick (runs all three tasks, highly optimized for Hobby tier)
 router.get('/tick', verifyCron, async (req, res) => {
     const results = {};
-    
+
     try {
         console.log('[Cron] Executing consolidated cron tick...');
-        
+
         // Ensure bot is initialized and DB settings are loaded
         await botService.getRunningBot();
-        
+
         // Run sync-mute
         try {
             await botService.syncGroupMuteState();
@@ -77,7 +77,7 @@ router.get('/tick', verifyCron, async (req, res) => {
         } catch (e) {
             results.syncMute = `error: ${e.message}`;
         }
-        
+
         // Run order reminder
         try {
             await botService.sendOrderReminderIfDue();
@@ -85,7 +85,7 @@ router.get('/tick', verifyCron, async (req, res) => {
         } catch (e) {
             results.reminder = `error: ${e.message}`;
         }
-        
+
         // Run daily report
         try {
             await botService.sendDailyReportIfDue();
@@ -93,7 +93,7 @@ router.get('/tick', verifyCron, async (req, res) => {
         } catch (e) {
             results.report = `error: ${e.message}`;
         }
-        
+
         // Run supply report auto-send
         try {
             await botService.sendSupplyReportIfDue();
@@ -101,7 +101,7 @@ router.get('/tick', verifyCron, async (req, res) => {
         } catch (e) {
             results.supplyReport = `error: ${e.message}`;
         }
-        
+
         // Run lunch order reminder
         try {
             await botService.sendLunchReminderIfDue();
@@ -109,7 +109,7 @@ router.get('/tick', verifyCron, async (req, res) => {
         } catch (e) {
             results.lunchReminder = `error: ${e.message}`;
         }
-        
+
         return res.json({ success: true, results });
     } catch (error) {
         console.error('[Cron] Tick failed:', error.message);
@@ -125,14 +125,14 @@ router.get('/telegram-setup', async (req, res) => {
         if (!runningBot) {
             return res.status(400).json({ error: 'Telegram Bot is not configured or token is missing.' });
         }
-        
+
         const host = req.get('host');
         // Vercel routes are always https in production, but support http for local testing
         const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
         const webhookUrl = `${protocol}://${host}/api/telegram-webhook`;
-        
+
         await runningBot.telegram.setWebhook(webhookUrl);
-        
+
         return res.json({
             success: true,
             message: 'Telegram webhook registered successfully',
