@@ -620,19 +620,6 @@ const sendOrderReminderIfDue = async () => {
             console.log(`Sent order reminder for branch ${branch.name} to group ${branchGroupId}`);
         });
     }
-
-    // 2. Main group reminder
-    const mainGroupId = await getGroupId();
-    if (mainGroupId) {
-        const mainMinutes = parseTimeToMinutes(await getSettingValue('order_start_time'));
-        await runIfDueToday(mainMinutes, 'last_reminder_date', today, async () => {
-            await runningBot.telegram.sendMessage(
-                mainGroupId,
-                `សូមអ្នកទាំងអស់គ្នាកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក (${displayDate})។\n\nទម្រង់កម្មង់:\n- ឈ្មោះ : Full Name\n- សាខា : BYD6A\n- កម្មង់នៅថ្ងៃទី : ${toOrderInputDate(nextLunchDateStr)} ${SYMBOLS.ordered}`
-            );
-            console.log(`Sent main order reminder to group ${mainGroupId}`);
-        });
-    }
 };
 
 /**
