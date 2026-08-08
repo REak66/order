@@ -308,36 +308,41 @@ const isManagementPosition = (position) => {
 const buildSupplyOrderSummary = async (orderDate) => {
     const users = await User.find({});
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
-    const orderedUserIds = new Set(orders.map(o => o.user.toString()));
-    const isOrdered = (user) => orderedUserIds.has(user._id.toString());
 
     const branchTotals = BRANCHES.map(branch => {
-        const orderedUsers = users.filter(u => u.branch === branch.name && isOrdered(u));
-        const managementCount = orderedUsers.filter(u => isManagementPosition(u.position)).length;
+        const branchOrders = orders.filter(o => {
+            const user = users.find(u => u._id.toString() === o.user.toString());
+            return user && user.branch === branch.name;
+        });
+
+        // Management → Chinese Food; others → Khmer Food
+        const chinese = branchOrders.filter(o => {
+            const user = users.find(u => u._id.toString() === o.user.toString());
+            return user && isManagementPosition(user.position);
+        }).length;
+        const khmer = branchOrders.length - chinese;
+
         return {
-            label: branch.reportLabel,
-            count: orderedUsers.length,
-            managementCount
+            label: branch.reportLabel,   // e.g. "6A", "CityMall", "60M"
+            total: branchOrders.length,
+            khmer,
+            chinese
         };
     });
-    const totalAll = branchTotals.reduce((sum, b) => sum + b.count, 0);
 
-    // Format date as DD/MM/YYYY
+    const totalAll = branchTotals.reduce((sum, b) => sum + b.total, 0);
+
     const [year, month, day] = orderDate.split('-');
     const displayDate = `${day}/${month}/${year}`;
 
-    let message = `📦 Supplier Order Summary\n`;
-    message += `📅 Date: ${displayDate}\n\n`;
+    let message = `📦 Lunch Order Report For : ${displayDate}\n\n`;
     for (const b of branchTotals) {
-        message += `📍${b.label} order = ${b.count} pcs`;
-        if (b.managementCount > 0) {
-            message += ` (Management x ${b.managementCount})`;
-        }
-        message += `\n`;
+        message += `+ BYD ${b.label} TOTAL = ${b.total} psc\n`;
+        message += `      - Khmer Food = ${b.khmer} psc\n`;
+        message += `      - Chinese Food = ${b.chinese} psc\n\n`;
     }
-    message += `\n📊 Total order = ${totalAll} pcs`;
+    message += `📊 Total order = ${totalAll} psc`;
 
-    // Append admin custom note if configured
     const customNote = (await getSettingValue('supply_custom_message'))?.trim();
     if (customNote) {
         message += `\n\n📝 ${customNote}`;
@@ -621,6 +626,88 @@ const sendOrderReminderIfDue = async () => {
         });
     }
 };
+const REMINDER_SLOTS = [
+    { key: '07', label: '07:00 AM Reminder', defaultTime: '07:00' },
+    { key: '12', label: '12:00 PM Reminder', defaultTime: '12:00' },
+    { key: '15', label: '03:00 PM Reminder', defaultTime: '15:00' }
+];
+
+/**
+ * Builds the customized reminder message for a specific slot.
+ * Checks slot-specific message first, then falls back to global English + Khmer reminder message.
+ */
+const buildSlotReminderMessage = async (slotKey) => {
+    const customDirect = (await getSettingValue(`reminder_${slotKey}_message`))?.trim();
+    if (customDirect) return customDirect;
+
+    const enMsg = (await getSettingValue(`reminder_${slotKey}_message_en`))?.trim();
+    const khMsg = (await getSettingValue(`reminder_${slotKey}_message_kh`))?.trim();
+
+    if (enMsg || khMsg) {
+        const finalEn = enMsg || (await getSettingValue('lunch_reminder_message_en'))?.trim() || DEFAULT_LUNCH_REMINDER_EN;
+        const finalKh = khMsg || (await getSettingValue('lunch_reminder_message_kh'))?.trim() || DEFAULT_LUNCH_REMINDER_KH;
+        return `${finalEn}\n\n${finalKh}`;
+    }
+
+    return buildLunchReminderMessage();
+};
+
+const sendSlotReminderIfDue = async (slot) => {
+    const enabled = await getSettingValue(`reminder_${slot.key}_enabled`);
+    if (enabled === 'false') return;
+
+    const timeStr = (await getSettingValue(`reminder_${slot.key}_time`)) || slot.defaultTime;
+    const settingMinutes = parseTimeToMinutes(timeStr);
+    if (settingMinutes === null) return;
+
+    const today = toLocalIsoDate();
+    const stateKey = `last_reminder_${slot.key}_date`;
+    const lastSent = await getPersistentState(stateKey);
+    if (lastSent === today) return;
+
+    // Only send if current time >= settingMinutes
+    if (getLocalMinutes() < settingMinutes) return;
+
+    const runningBot = await getRunningBot();
+    if (!runningBot) return;
+
+    const message = await buildSlotReminderMessage(slot.key);
+    const slotLabel = slot.label || slot.defaultTime || slot.key;
+
+    const mainGroupId = await getGroupId();
+    const results = { sentGroups: [] };
+
+    // Send to branch groups
+    for (const branch of BRANCHES) {
+        const branchGroupId = await getBranchGroupId(branch.name);
+        if (!branchGroupId) continue;
+        try {
+            await runningBot.telegram.sendMessage(branchGroupId, message);
+            await logReminder(message, branchGroupId, `${branch.name} (${slotLabel})`, 'success');
+            results.sentGroups.push(branch.name);
+        } catch (e) {
+            await logReminder(message, branchGroupId, `${branch.name} (${slotLabel})`, 'error', e.message);
+            console.error(`Reminder ${slot.key} branch ${branch.name}: ${e.message}`);
+        }
+    }
+
+    // Send to main group
+    if (mainGroupId) {
+        try {
+            await runningBot.telegram.sendMessage(mainGroupId, message);
+            await logReminder(message, mainGroupId, `Main Group (${slotLabel})`, 'success');
+            results.sentGroups.push('Main Group');
+        } catch (e) {
+            await logReminder(message, mainGroupId, `Main Group (${slotLabel})`, 'error', e.message);
+            console.error(`Reminder ${slot.key} main: ${e.message}`);
+        }
+    }
+
+    if (results.sentGroups.length > 0) {
+        await setPersistentState(stateKey, today);
+        console.log(`Reminder ${slot.key} (${slotLabel}) sent to ${results.sentGroups.length} groups.`);
+    }
+};
 
 /**
  * Auto-sends the Supplier Order Summary if the configured supply_report_time
@@ -696,29 +783,38 @@ const logReminder = async (message, groupId, groupLabel, status, errorMessage = 
 };
 
 /**
- * Auto-sends the lunch order reminder if the configured lunch_reminder_time
- * has been reached, the feature is enabled, and it hasn't been sent today.
+ * Auto-sends lunch order reminders for all configured reminder slots.
  */
 const sendLunchReminderIfDue = async () => {
-    const enabled = await getSettingValue('lunch_reminder_enabled');
-    if (enabled !== 'true') return;
+    for (const slot of REMINDER_SLOTS) {
+        await sendSlotReminderIfDue(slot);
+    }
+};
 
-    const reminderTime = await getSettingValue('lunch_reminder_time');
-    if (!reminderTime) return;
+/**
+ * Manually sends the lunch order reminder immediately ("Send Now" button).
+ * Can send a specific slot (e.g. '07', '12', '15') or all slots.
+ */
+const sendLunchReminderNow = async (slotKey = null) => {
+    const runningBot = await getRunningBot();
+    if (!runningBot) {
+        return { success: false, error: 'Telegram bot is not configured or running.' };
+    }
 
-    const settingMinutes = parseTimeToMinutes(reminderTime);
-    if (settingMinutes === null) return;
+    const results = { sentGroups: [], errors: [] };
+    const mainGroupId = await getGroupId();
 
-    const today = toLocalIsoDate();
+    let slotsToSend = [];
+    if (slotKey) {
+        const found = REMINDER_SLOTS.find(s => s.key === slotKey);
+        slotsToSend = [found || { key: slotKey, defaultTime: '12:00', label: `Reminder ${slotKey}` }];
+    } else {
+        slotsToSend = REMINDER_SLOTS;
+    }
 
-    await runIfDueToday(settingMinutes, 'last_lunch_reminder_date', today, async () => {
-        const runningBot = await getRunningBot();
-        if (!runningBot) {
-            console.warn('[LunchReminder] Bot not running, skipping.');
-            return;
-        }
-
-        const message = await buildLunchReminderMessage();
+    for (const slot of slotsToSend) {
+        const message = await buildSlotReminderMessage(slot.key);
+        const slotLabel = slot.label || slot.defaultTime || slot.key;
 
         // 1. Send to branch-specific groups
         for (const branch of BRANCHES) {
@@ -727,67 +823,24 @@ const sendLunchReminderIfDue = async () => {
 
             try {
                 await runningBot.telegram.sendMessage(branchGroupId, message);
-                await logReminder(message, branchGroupId, branch.name, 'success');
-                console.log(`[LunchReminder] Sent to branch ${branch.name} (${branchGroupId})`);
+                await logReminder(message, branchGroupId, `${branch.name} (${slotLabel})`, 'success');
+                results.sentGroups.push(`${branch.name} (${slotLabel})`);
             } catch (error) {
-                await logReminder(message, branchGroupId, branch.name, 'error', error.message);
-                console.error(`[LunchReminder] Error sending to branch ${branch.name}:`, error.message);
+                await logReminder(message, branchGroupId, `${branch.name} (${slotLabel})`, 'error', error.message);
+                results.errors.push(`${branch.name} (${slotLabel}): ${error.message}`);
             }
         }
 
         // 2. Send to main group
-        const mainGroupId = await getGroupId();
         if (mainGroupId) {
             try {
                 await runningBot.telegram.sendMessage(mainGroupId, message);
-                await logReminder(message, mainGroupId, 'Main Group', 'success');
-                console.log(`[LunchReminder] Sent to main group (${mainGroupId})`);
+                await logReminder(message, mainGroupId, `Main Group (${slotLabel})`, 'success');
+                results.sentGroups.push(`Main Group (${slotLabel})`);
             } catch (error) {
-                await logReminder(message, mainGroupId, 'Main Group', 'error', error.message);
-                console.error(`[LunchReminder] Error sending to main group:`, error.message);
+                await logReminder(message, mainGroupId, `Main Group (${slotLabel})`, 'error', error.message);
+                results.errors.push(`Main Group (${slotLabel}): ${error.message}`);
             }
-        }
-    });
-};
-
-/**
- * Manually sends the lunch order reminder immediately ("Send Now" button).
- * Does not check time or the last-sent state key.
- */
-const sendLunchReminderNow = async () => {
-    const runningBot = await getRunningBot();
-    if (!runningBot) {
-        return { success: false, error: 'Telegram bot is not configured or running.' };
-    }
-
-    const message = await buildLunchReminderMessage();
-    const results = { sentGroups: [], errors: [] };
-
-    // 1. Send to branch-specific groups
-    for (const branch of BRANCHES) {
-        const branchGroupId = await getBranchGroupId(branch.name);
-        if (!branchGroupId) continue;
-
-        try {
-            await runningBot.telegram.sendMessage(branchGroupId, message);
-            await logReminder(message, branchGroupId, branch.name, 'success');
-            results.sentGroups.push(branch.name);
-        } catch (error) {
-            await logReminder(message, branchGroupId, branch.name, 'error', error.message);
-            results.errors.push(`${branch.name}: ${error.message}`);
-        }
-    }
-
-    // 2. Send to main group
-    const mainGroupId = await getGroupId();
-    if (mainGroupId) {
-        try {
-            await runningBot.telegram.sendMessage(mainGroupId, message);
-            await logReminder(message, mainGroupId, 'Main Group', 'success');
-            results.sentGroups.push('Main Group');
-        } catch (error) {
-            await logReminder(message, mainGroupId, 'Main Group', 'error', error.message);
-            results.errors.push(`Main Group: ${error.message}`);
         }
     }
 
@@ -1091,11 +1144,12 @@ const handleWebhook = async (req, res, next) => {
 
 if (!process.env.VERCEL) {
     const CRON_OPTS = { timezone: TIME_ZONE };
-    cron.schedule('* * * * *', () => sendOrderReminderIfDue(), CRON_OPTS);
     cron.schedule('* * * * *', () => sendDailyReportIfDue(), CRON_OPTS);
     cron.schedule('* * * * *', () => syncGroupMuteState(), CRON_OPTS);
     cron.schedule('* * * * *', () => sendSupplyReportIfDue(), CRON_OPTS);
-    cron.schedule('* * * * *', () => sendLunchReminderIfDue(), CRON_OPTS);
+    cron.schedule('* * * * *', () => {
+        REMINDER_SLOTS.forEach(slot => sendSlotReminderIfDue(slot));
+    }, CRON_OPTS);
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
@@ -1125,6 +1179,9 @@ module.exports = {
     buildDailyReportForBranch,
     buildSupplyOrderSummary,
     replaceGroupMessage,
+    buildSlotReminderMessage,
     sendLunchReminderIfDue,
-    sendLunchReminderNow
+    sendLunchReminderNow,
+    REMINDER_SLOTS,
+    sendSlotReminderIfDue
 };

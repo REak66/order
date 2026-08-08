@@ -1,9 +1,20 @@
+// models/Order.js
 const mongoose = require('mongoose');
 
 const OrderSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     order_date: String, // YYYY-MM-DD
-    status: { type: String, enum: ['ordered', 'cancelled', 'not_ordered'], default: 'ordered' },
+    status: {
+        type: String,
+        enum: ['ordered', 'cancelled', 'not_ordered'],
+        default: 'ordered'
+    },
+    food_type: {
+        type: String,
+        enum: ['Khmer Food', 'Chinese Food'],
+        default: 'Chinese Food',
+        required: true
+    },
     created_at: { type: Date, default: Date.now }
 });
 

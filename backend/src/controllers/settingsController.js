@@ -16,7 +16,26 @@ const DEFAULT_SETTINGS = {
     lunch_reminder_time: '15:00',
     lunch_reminder_message_en: '',
     lunch_reminder_message_kh: '',
-    supply_custom_message: ''
+    supply_custom_message: '',
+
+    // 3 Reminder Schedules (07:00 AM, 12:00 PM, 03:00 PM)
+    reminder_07_enabled: 'true',
+    reminder_07_time: '07:00',
+    reminder_07_message_en: '',
+    reminder_07_message_kh: '',
+    reminder_07_message: '',
+
+    reminder_12_enabled: 'true',
+    reminder_12_time: '12:00',
+    reminder_12_message_en: '',
+    reminder_12_message_kh: '',
+    reminder_12_message: '',
+
+    reminder_15_enabled: 'true',
+    reminder_15_time: '15:00',
+    reminder_15_message_en: '',
+    reminder_15_message_kh: '',
+    reminder_15_message: ''
 };
 
 const TIME_SETTING_KEYS = ['order_start_time', 'order_end_time', 'report_time'];
@@ -54,9 +73,14 @@ exports.updateSettings = asyncHandler(async (req, res) => {
     const settings = { ...req.body };
     const shouldRestartBot = Object.prototype.hasOwnProperty.call(settings, 'bot_token');
 
-    // Dynamically validate global and branch-specific times and group IDs
+    // Dynamically validate global, branch-specific, and reminder slot times and group IDs
     for (const [key, value] of Object.entries(settings)) {
-        if (key.includes('order_start_time') || key.includes('order_end_time') || key.includes('report_time')) {
+        if (
+            key.includes('order_start_time') ||
+            key.includes('order_end_time') ||
+            key.includes('report_time') ||
+            (key.startsWith('reminder_') && key.endsWith('_time'))
+        ) {
             if (value !== undefined && value !== null && value !== '') {
                 const normalizedTime = normalizeTimeValue(value);
                 if (!normalizedTime) {
@@ -134,6 +158,16 @@ exports.updateSettings = asyncHandler(async (req, res) => {
     if (settings.lunch_reminder_time !== undefined && settings.lunch_reminder_time !== oldLunchReminderTime) {
         await Setting.deleteOne({ key: 'last_lunch_reminder_date' });
         console.log(`Cleared last_lunch_reminder_date because lunch_reminder_time changed from ${oldLunchReminderTime} to ${settings.lunch_reminder_time}`);
+    }
+
+    // If any reminder slot time was changed, clear last_reminder_${slotKey}_date
+    for (const slot of ['07', '12', '15']) {
+        const slotTimeKey = `reminder_${slot}_time`;
+        const oldVal = existingSettings.find(s => s.key === slotTimeKey)?.value || '';
+        if (settings[slotTimeKey] !== undefined && settings[slotTimeKey] !== oldVal) {
+            await Setting.deleteOne({ key: `last_reminder_${slot}_date` });
+            console.log(`Cleared last_reminder_${slot}_date because ${slotTimeKey} changed from ${oldVal} to ${settings[slotTimeKey]}`);
+        }
     }
 
     if (shouldRestartBot) {
@@ -249,17 +283,18 @@ exports.sendToSupply = asyncHandler(async (req, res) => {
 });
 
 exports.sendLunchReminderNow = asyncHandler(async (req, res) => {
-    const result = await bot.sendLunchReminderNow();
+    const slotKey = req.body?.slotKey || req.query?.slotKey || null;
+    const result = await bot.sendLunchReminderNow(slotKey);
 
     if (!result.success) {
         return res.status(400).json({ message: result.error });
     }
 
     const parts = [];
-    if (result.sentGroups.length > 0) {
+    if (result.sentGroups && result.sentGroups.length > 0) {
         parts.push(`Sent to: ${result.sentGroups.join(', ')}`);
     }
-    if (result.errors.length > 0) {
+    if (result.errors && result.errors.length > 0) {
         parts.push(`Errors: ${result.errors.join('; ')}`);
     }
 

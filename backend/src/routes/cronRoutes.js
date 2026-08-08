@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const botService = require('../services/botService');
+const { REMINDER_SLOTS } = require('../services/botService');
 
 // Middleware to verify Vercel Cron headers or custom cron secret if needed
 const verifyCron = (req, res, next) => {
@@ -39,7 +40,10 @@ router.get('/reminder', verifyCron, async (req, res) => {
     try {
         console.log('[Cron] Checking/sending order reminder...');
         await botService.getRunningBot();
-        await botService.sendOrderReminderIfDue();
+        for (const slot of REMINDER_SLOTS) {
+            await botService.sendSlotReminderIfDue(slot);
+        }
+        await botService.sendLunchReminderIfDue();
         return res.json({ success: true, message: 'Order reminder processed' });
     } catch (error) {
         console.error('[Cron] Order reminder error:', error.message);
@@ -78,14 +82,6 @@ router.get('/tick', verifyCron, async (req, res) => {
             results.syncMute = `error: ${e.message}`;
         }
 
-        // Run order reminder
-        try {
-            await botService.sendOrderReminderIfDue();
-            results.reminder = 'success';
-        } catch (e) {
-            results.reminder = `error: ${e.message}`;
-        }
-
         // Run daily report
         try {
             await botService.sendDailyReportIfDue();
@@ -102,13 +98,16 @@ router.get('/tick', verifyCron, async (req, res) => {
             results.supplyReport = `error: ${e.message}`;
         }
 
-        // Run lunch order reminder
+        // inside the /tick handler, add:
         try {
-            await botService.sendLunchReminderIfDue();
-            results.lunchReminder = 'success';
+            for (const slot of REMINDER_SLOTS) {
+                await botService.sendSlotReminderIfDue(slot);
+            }
+            results.slotReminders = 'success';
         } catch (e) {
-            results.lunchReminder = `error: ${e.message}`;
+            results.slotReminders = `error: ${e.message}`;
         }
+
 
         return res.json({ success: true, results });
     } catch (error) {

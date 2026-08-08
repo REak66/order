@@ -10,7 +10,13 @@ import {
   Bell,
   FileText,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Sunrise,
+  Sun,
+  Sunset,
+  Sparkles,
+  RefreshCw,
+  Play
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -38,7 +44,23 @@ const Settings = () => {
     lunch_reminder_enabled: 'false',
     lunch_reminder_time: '15:00',
     lunch_reminder_message_en: '',
-    lunch_reminder_message_kh: ''
+    lunch_reminder_message_kh: '',
+
+    // 3 reminder slots (07:00 AM, 12:00 PM, 03:00 PM)
+    reminder_07_enabled: 'true',
+    reminder_07_time: '07:00',
+    reminder_07_message_en: '',
+    reminder_07_message_kh: '',
+
+    reminder_12_enabled: 'true',
+    reminder_12_time: '12:00',
+    reminder_12_message_en: '',
+    reminder_12_message_kh: '',
+
+    reminder_15_enabled: 'true',
+    reminder_15_time: '15:00',
+    reminder_15_message_en: '',
+    reminder_15_message_kh: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -134,6 +156,7 @@ const Settings = () => {
   const [sendingReport, setSendingReport] = useState(false);
   const [sendingSupply, setSendingSupply] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
+  const [sendingSlot, setSendingSlot] = useState({ '07': false, '12': false, '15': false });
   const [reminderLogs, setReminderLogs] = useState([]);
   const [reminderLogsPage, setReminderLogsPage] = useState(1);
   const [reminderLogsTotalPages, setReminderLogsTotalPages] = useState(1);
@@ -168,17 +191,25 @@ const Settings = () => {
     }
   };
 
-  const handleSendLunchReminder = async () => {
-    setSendingReminder(true);
+  const handleSendLunchReminder = async (slotKey = null) => {
+    if (slotKey) {
+      setSendingSlot(prev => ({ ...prev, [slotKey]: true }));
+    } else {
+      setSendingReminder(true);
+    }
     try {
-      const res = await api.post('/api/settings/send-lunch-reminder');
+      const res = await api.post('/api/settings/send-lunch-reminder', { slotKey });
       toast.success(res.data.message || 'Lunch reminder sent!');
       fetchReminderLogs(1);
     } catch (error) {
       const msg = error.response?.data?.message || 'Failed to send lunch reminder';
       toast.error(msg);
     } finally {
-      setSendingReminder(false);
+      if (slotKey) {
+        setSendingSlot(prev => ({ ...prev, [slotKey]: false }));
+      } else {
+        setSendingReminder(false);
+      }
     }
   };
 
@@ -555,140 +586,415 @@ const Settings = () => {
                 </div>
               </div>
             </div>
-
-            {/* Supply Message Preview */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                <Send className="text-emerald-500" size={20} />
-                <h3 className="font-bold text-slate-800 dark:text-white">Message Preview</h3>
-              </div>
-              <div className="p-4 sm:p-6">
-                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 font-mono text-sm text-slate-700 dark:text-slate-300 space-y-1 border border-slate-100 dark:border-slate-700 whitespace-pre-wrap">
-                  <p>📦 Supplier Order Summary</p>
-                  <p>📅 Date: DD/MM/YYYY</p>
-                  <p>&nbsp;</p>
-                  <p>📍6A order = total(6A) pcs <span className="text-emerald-500">(Management x N)</span></p>
-                  <p>📍CityMall order = total(CityMall) pcs <span className="text-emerald-500">(Management x N)</span></p>
-                  <p>📍60M order = total(60M) pcs <span className="text-emerald-500">(Management x N)</span></p>
-                  <p>&nbsp;</p>
-                  <p>📊 Total order = Total(all branch) pcs</p>
-                  {settings.supply_custom_message?.trim() && (
-                    <>
-                      <p>&nbsp;</p>
-                      <p className="text-emerald-600 dark:text-emerald-400">📝 {settings.supply_custom_message.trim()}</p>
-                    </>
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-                  <span className="text-emerald-500 font-semibold">Management</span> = staff with "Manager" in position (e.g. Technician Manager), excluding Department Manager.
-                  Only shown when count &gt; 0.
-                </p>
-              </div>
-            </div>
           </div>
         )}
 
         {activeTab === 'reminder' && (
           <div className="space-y-8 motion-preset-fade motion-duration-200">
-            {/* Enable/Disable Toggle */}
-            <div className="flex items-center justify-between p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
-              <div>
-                <h4 className="font-bold text-slate-800 dark:text-white">Auto Lunch Order Reminder</h4>
-                <p className="text-slate-500 text-xs mt-0.5">Automatically send a lunch order reminder message to Telegram groups at the configured time</p>
+            {/* Header Info Banner */}
+            <div className="p-6 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-500/20 shrink-0">
+                  <Bell size={24} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-white">Daily Telegram Reminder Schedules</h3>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    Configure automated lunch order reminders sent to all Telegram groups (Branch groups &amp; Main group) at 3 customizable daily schedules (07:00 AM, 12:00 PM, 03:00 PM).
+                  </p>
+                </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={settings.lunch_reminder_enabled === 'true'}
-                  onChange={(e) => {
-                    setSettings({
-                      ...settings,
-                      lunch_reminder_enabled: e.target.checked ? 'true' : 'false'
-                    });
-                  }}
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-amber-600"></div>
-              </label>
             </div>
 
-            {/* Schedule Config */}
+            {/* 1. Slot 07:00 AM */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                <Clock className="text-amber-500" size={20} />
-                <h3 className="font-bold text-slate-800 dark:text-white">Reminder Schedule</h3>
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                    <Sunrise size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-slate-800 dark:text-white">Morning Reminder</h3>
+                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        {settings.reminder_07_time || '07:00'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Start send: 07:00 AM morning order reminder</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 self-end sm:self-center">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    {settings.reminder_07_enabled !== 'false' ? 'Active' : 'Disabled'}
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={settings.reminder_07_enabled !== 'false'}
+                      onChange={(e) => {
+                        setSettings({
+                          ...settings,
+                          reminder_07_enabled: e.target.checked ? 'true' : 'false'
+                        });
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-amber-600"></div>
+                  </label>
+                </div>
               </div>
-              <div className="p-4 sm:p-6 space-y-4">
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  Set the time to automatically send the lunch order reminder daily. The reminder will be sent to all configured Telegram groups.
-                </p>
+
+              <div className="p-4 sm:p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Send Time</label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Clock size={16} className="text-amber-500" />
+                      <span>Start Send Time</span>
+                    </label>
                     <TimePicker
-                      value={settings.lunch_reminder_time}
-                      onChange={(e) => setSettings({ ...settings, lunch_reminder_time: e.target.value })}
+                      value={settings.reminder_07_time || '07:00'}
+                      onChange={(e) => setSettings({ ...settings, reminder_07_time: e.target.value })}
                     />
                     <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">
-                      {settings.lunch_reminder_enabled === 'true'
-                        ? `Auto-send enabled at ${settings.lunch_reminder_time || '15:00'}`
-                        : 'Auto-send disabled \u2014 enable the toggle above'}
+                      {settings.reminder_07_enabled !== 'false'
+                        ? `Auto-send enabled at ${settings.reminder_07_time || '07:00'}`
+                        : 'Auto-send disabled'}
                     </span>
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Customize English Text
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
+                      placeholder="Good morning everyone! Please place your lunch order for today. Thank you!"
+                      value={settings.reminder_07_message_en}
+                      onChange={(e) => setSettings({ ...settings, reminder_07_message_en: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Customize Khmer Text
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
+                    placeholder="អរុណសួស្តីអ្នកទាំងអស់គ្នា! សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃនេះ។ អរគុណ! 🌤️"
+                    value={settings.reminder_07_message_kh}
+                    onChange={(e) => setSettings({ ...settings, reminder_07_message_kh: e.target.value })}
+                  />
+                </div>
+
+                {/* Slot 07 Preview & Test Button */}
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                      <Bell size={14} className="text-amber-500" />
+                      Telegram Preview (07:00 AM)
+                    </span>
+                    <button
+                      type="button"
+                      disabled={sendingSlot['07'] || saving}
+                      onClick={() => handleSendLunchReminder('07')}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm shadow-amber-600/20 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {sendingSlot['07'] ? (
+                        <>
+                          <RefreshCw size={12} className="animate-spin" />
+                          <span>Sending 07:00 AM...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={12} />
+                          <span>Send 07:00 AM Now</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap border border-slate-100 dark:border-slate-800">
+                    {(settings.reminder_07_message_en?.trim() || settings.lunch_reminder_message_en?.trim() || 'Good morning everyone!\n\nPlease place your lunch order for today. Thank you!')}
+                    {'\n\n'}
+                    {(settings.reminder_07_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'អរុណសួស្តីអ្នកទាំងអស់គ្នា! សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃនេះ។ អរគុណ! 🌤️')}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Message Editor */}
+            {/* 2. Slot 12:00 PM */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                    <Sun size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-slate-800 dark:text-white">Midday Reminder</h3>
+                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        {settings.reminder_12_time || '12:00'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Start send: 12:00 PM / midday follow-up reminder</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 self-end sm:self-center">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    {settings.reminder_12_enabled !== 'false' ? 'Active' : 'Disabled'}
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={settings.reminder_12_enabled !== 'false'}
+                      onChange={(e) => {
+                        setSettings({
+                          ...settings,
+                          reminder_12_enabled: e.target.checked ? 'true' : 'false'
+                        });
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-amber-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Clock size={16} className="text-amber-500" />
+                      <span>Start Send Time</span>
+                    </label>
+                    <TimePicker
+                      value={settings.reminder_12_time || '12:00'}
+                      onChange={(e) => setSettings({ ...settings, reminder_12_time: e.target.value })}
+                    />
+                    <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">
+                      {settings.reminder_12_enabled !== 'false'
+                        ? `Auto-send enabled at ${settings.reminder_12_time || '12:00'}`
+                        : 'Auto-send disabled'}
+                    </span>
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Customize English Text
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
+                      placeholder="Hello everyone! Please remember to place your lunch order before the cutoff time. Thank you!"
+                      value={settings.reminder_12_message_en}
+                      onChange={(e) => setSettings({ ...settings, reminder_12_message_en: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Customize Khmer Text
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
+                    placeholder="សួស្តីអ្នកទាំងអស់គ្នា! សូមកុំភ្លេចធ្វើការកម្មង់អាហារថ្ងៃត្រង់មុនពេលផុតកំណត់។ អរគុណ! 🍱"
+                    value={settings.reminder_12_message_kh}
+                    onChange={(e) => setSettings({ ...settings, reminder_12_message_kh: e.target.value })}
+                  />
+                </div>
+
+                {/* Slot 12 Preview & Test Button */}
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                      <Bell size={14} className="text-amber-500" />
+                      Telegram Preview (12:00 PM)
+                    </span>
+                    <button
+                      type="button"
+                      disabled={sendingSlot['12'] || saving}
+                      onClick={() => handleSendLunchReminder('12')}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm shadow-amber-600/20 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {sendingSlot['12'] ? (
+                        <>
+                          <RefreshCw size={12} className="animate-spin" />
+                          <span>Sending 12:00 PM...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={12} />
+                          <span>Send 12:00 PM Now</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap border border-slate-100 dark:border-slate-800">
+                    {(settings.reminder_12_message_en?.trim() || settings.lunch_reminder_message_en?.trim() || 'Hello everyone!\n\nPlease remember to place your lunch order before the cutoff time. Thank you!')}
+                    {'\n\n'}
+                    {(settings.reminder_12_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'សួស្តីអ្នកទាំងអស់គ្នា! សូមកុំភ្លេចធ្វើការកម្មង់អាហារថ្ងៃត្រង់មុនពេលផុតកំណត់។ អរគុណ! 🍱')}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Slot 03:00 PM */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                    <Sunset size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-slate-800 dark:text-white">Afternoon Reminder</h3>
+                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        {settings.reminder_15_time || '15:00'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Start send: 03:00 PM next-day lunch reminder</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 self-end sm:self-center">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    {settings.reminder_15_enabled !== 'false' ? 'Active' : 'Disabled'}
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={settings.reminder_15_enabled !== 'false'}
+                      onChange={(e) => {
+                        setSettings({
+                          ...settings,
+                          reminder_15_enabled: e.target.checked ? 'true' : 'false'
+                        });
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-650 peer-checked:bg-amber-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Clock size={16} className="text-amber-500" />
+                      <span>Start Send Time</span>
+                    </label>
+                    <TimePicker
+                      value={settings.reminder_15_time || '15:00'}
+                      onChange={(e) => setSettings({ ...settings, reminder_15_time: e.target.value })}
+                    />
+                    <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">
+                      {settings.reminder_15_enabled !== 'false'
+                        ? `Auto-send enabled at ${settings.reminder_15_time || '15:00'}`
+                        : 'Auto-send disabled'}
+                    </span>
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Customize English Text
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
+                      placeholder="Hello everyone, Please place your lunch order for tomorrow. Thank you!"
+                      value={settings.reminder_15_message_en}
+                      onChange={(e) => setSettings({ ...settings, reminder_15_message_en: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Customize Khmer Text
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
+                    placeholder="សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!😘"
+                    value={settings.reminder_15_message_kh}
+                    onChange={(e) => setSettings({ ...settings, reminder_15_message_kh: e.target.value })}
+                  />
+                </div>
+
+                {/* Slot 15 Preview & Test Button */}
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                      <Bell size={14} className="text-amber-500" />
+                      Telegram Preview (03:00 PM)
+                    </span>
+                    <button
+                      type="button"
+                      disabled={sendingSlot['15'] || saving}
+                      onClick={() => handleSendLunchReminder('15')}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm shadow-amber-600/20 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {sendingSlot['15'] ? (
+                        <>
+                          <RefreshCw size={12} className="animate-spin" />
+                          <span>Sending 03:00 PM...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={12} />
+                          <span>Send 03:00 PM Now</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap border border-slate-100 dark:border-slate-800">
+                    {(settings.reminder_15_message_en?.trim() || settings.lunch_reminder_message_en?.trim() || 'Hello everyone,\n\nPlease place your lunch order for tomorrow. Thank you!')}
+                    {'\n\n'}
+                    {(settings.reminder_15_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!😘')}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Global Default Bilingual Message Card */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
                 <FileText className="text-amber-500" size={20} />
-                <h3 className="font-bold text-slate-800 dark:text-white">Reminder Message</h3>
+                <div>
+                  <h3 className="font-bold text-slate-800 dark:text-white">Default Fallback Reminder Message</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Used automatically if any schedule slot has empty custom text</p>
+                </div>
               </div>
               <div className="p-4 sm:p-6 space-y-6">
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  Customize the reminder message in both English and Khmer. Leave empty to use the default messages.
-                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">English Message</label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Default English Message</label>
                     <textarea
-                      rows={4}
-                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none"
-                      placeholder={"Hello everyone,\n\nPlease place your lunch order for tomorrow. Thank you!"}
+                      rows={3}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
+                      placeholder="Hello everyone, Please place your lunch order for tomorrow. Thank you!"
                       value={settings.lunch_reminder_message_en}
                       onChange={(e) => setSettings({ ...settings, lunch_reminder_message_en: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Khmer Message</label>
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Default Khmer Message</label>
                     <textarea
-                      rows={4}
-                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none"
-                      placeholder={"\u179f\u17bd\u179f\u17d2\u178f\u17b8\u17a2\u17d2\u1793\u1780\u1791\u17b6\u17c6\u1784\u17a2\u179f\u17cb\u1782\u17d2\u1793\u17b6 \u179f\u17bc\u1798\u1792\u17d2\u179c\u17be\u1780\u17b6\u179a\u1780\u1798\u17d2\u1798\u1784\u17cb\u17a2\u17b6\u17a0\u17b6\u179a\u1790\u17d2\u1784\u17c3\u178f\u17d2\u179a\u1784\u17cb\u179f\u1798\u17d2\u179a\u17b6\u1794\u17cb\u1790\u17d2\u1784\u17c3\u179f\u17d2\u17a2\u17c2\u1780\u17d4 \u17a2\u179a\u1782\u17bb\u178e!\ud83d\ude18"}
+                      rows={3}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
+                      placeholder="សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!😘"
                       value={settings.lunch_reminder_message_kh}
                       onChange={(e) => setSettings({ ...settings, lunch_reminder_message_kh: e.target.value })}
                     />
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Message Preview */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                <Bell className="text-amber-500" size={20} />
-                <h3 className="font-bold text-slate-800 dark:text-white">Message Preview</h3>
-              </div>
-              <div className="p-4 sm:p-6">
-                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 font-mono text-sm text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700 whitespace-pre-wrap">
-                  {(settings.lunch_reminder_message_en?.trim() || 'Hello everyone,\n\nPlease place your lunch order for tomorrow. Thank you!')}
-                  {'\n\n'}
-                  {(settings.lunch_reminder_message_kh?.trim() || '\u179f\u17bd\u179f\u17d2\u178f\u17b8\u17a2\u17d2\u1793\u1780\u1791\u17b6\u17c6\u1784\u17a2\u179f\u17cb\u1782\u17d2\u1793\u17b6 \u179f\u17bc\u1798\u1792\u17d2\u179c\u17be\u1780\u17b6\u179a\u1780\u1798\u17d2\u1798\u1784\u17cb\u17a2\u17b6\u17a0\u17b6\u179a\u1790\u17d2\u1784\u17c3\u178f\u17d2\u179a\u1784\u17cb\u179f\u1798\u17d2\u179a\u17b6\u1794\u17cb\u1790\u17d2\u1784\u17c3\u179f\u17d2\u17a2\u17c2\u1780\u17d4 \u17a2\u179a\u1782\u17bb\u178e!\ud83d\ude18')}
-                </div>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-                  This is how the message will appear in Telegram. Both languages are combined into a single message.
-                </p>
               </div>
             </div>
 
@@ -702,9 +1008,10 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => fetchReminderLogs(1)}
-                  className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 font-semibold cursor-pointer"
+                  className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 font-semibold cursor-pointer flex items-center gap-1"
                 >
-                  Refresh
+                  <RefreshCw size={12} className={loadingLogs ? 'animate-spin' : ''} />
+                  <span>Refresh</span>
                 </button>
               </div>
               <div className="p-4 sm:p-6">
@@ -716,8 +1023,8 @@ const Settings = () => {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
-                            <th className="pb-3 pr-4 font-semibold">Date & Time</th>
-                            <th className="pb-3 pr-4 font-semibold">Group</th>
+                            <th className="pb-3 pr-4 font-semibold">Date &amp; Time</th>
+                            <th className="pb-3 pr-4 font-semibold">Group / Schedule</th>
                             <th className="pb-3 font-semibold">Status</th>
                           </tr>
                         </thead>
@@ -796,13 +1103,13 @@ const Settings = () => {
             <button
               type="button"
               disabled={sendingReminder || saving}
-              onClick={handleSendLunchReminder}
+              onClick={() => handleSendLunchReminder(null)}
               className="flex items-center gap-2 px-8 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {sendingReminder ? 'Sending...' : (
                 <>
                   <Bell size={20} />
-                  <span>Send Reminder Now</span>
+                  <span>Send All Reminders Now</span>
                 </>
               )}
             </button>
