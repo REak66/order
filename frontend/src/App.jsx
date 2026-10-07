@@ -1,50 +1,36 @@
-import { useEffect } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import Login from './pages/Login';
 import DashboardLayout from './layouts/DashboardLayout';
-import Dashboard from './pages/Dashboard';
-import StaffManagement from './pages/StaffManagement';
-import ManualOrder from './pages/ManualOrder';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import StaffPortal from './pages/StaffPortal';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import PageTransition from './components/application/PageTransition';
+import LoadingScreen from './components/LoadingScreen';
 
-const LoadingScreen = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-350">
-    <div className="flex flex-col items-center gap-4 text-center max-w-sm px-6">
-      <div className="relative flex items-center justify-center">
-        <div className="absolute w-24 h-24 bg-primary/10 rounded-full blur-xl animate-pulse"></div>
-        <span className="loading loading-dots loading-xl text-primary relative z-10"></span>
-      </div>
-      <div className="space-y-1">
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-          Staff Lunch Order
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium tracking-wide animate-pulse">
-          Preparing your session...
-        </p>
-      </div>
-    </div>
-  </div>
-);
+// Lazy load pages for code splitting & faster initial page load
+const Login = React.lazy(() => import('./pages/Login'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const StaffManagement = React.lazy(() => import('./pages/StaffManagement'));
+const ManualOrder = React.lazy(() => import('./pages/ManualOrder'));
+const Reports = React.lazy(() => import('./pages/Reports'));
+const Holidays = React.lazy(() => import('./pages/Holidays'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const StaffPortal = React.lazy(() => import('./pages/StaffPortal'));
 
 // Route guard: only for authenticated admins
 const AdminRoute = ({ children }) => {
   const { isAuthenticated, isAdmin, loading } = useAuth();
-  if (loading) return <LoadingScreen />;
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!isAdmin) return <Navigate to="/staff-portal" />;
+  if (loading) return <LoadingScreen message="Verifying admin credentials..." />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/staff-portal" replace />;
   return children;
 };
 
 // Route guard: only for authenticated staff
 const StaffRoute = ({ children }) => {
   const { isAuthenticated, isStaff, loading } = useAuth();
-  if (loading) return <LoadingScreen />;
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!isStaff) return <Navigate to="/" />;
+  if (loading) return <LoadingScreen message="Verifying staff session..." />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isStaff) return <Navigate to="/admin" replace />;
   return children;
 };
 
@@ -53,6 +39,21 @@ function AppRoutes() {
   const { isAuthenticated, isAdmin, loading } = useAuth();
 
   useEffect(() => {
+    const titles = {
+      '/': 'Staff Lunch Order System',
+      '/login': 'Staff Sign In - Lunch Order',
+      '/admin-login': 'Admin Sign In - Lunch Order',
+      '/admin/login': 'Admin Sign In - Lunch Order',
+      '/staff-portal': 'Staff Portal - Lunch Order',
+      '/admin': 'Dashboard - Admin Workspace',
+      '/admin/staff': 'Staff Management - Admin Workspace',
+      '/admin/manual-order': 'Manual Order - Admin Workspace',
+      '/admin/reports': 'Lunch Reports - Admin Workspace',
+      '/admin/holidays': 'Public Holidays - Admin Workspace',
+      '/admin/settings': 'Settings - Admin Workspace',
+    };
+    document.title = titles[location.pathname] || 'Staff Lunch Order System';
+
     const timer = setTimeout(() => {
       if (window.HSStaticMethods) {
         window.HSStaticMethods.autoInit();
@@ -61,59 +62,159 @@ function AppRoutes() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
+  if (loading) {
+    return <LoadingScreen message="Initializing session..." />;
+  }
+
   return (
-    <Routes>
-      {/* Login — redirect if already authenticated */}
-      <Route
-        path="/login"
-        element={
-          loading ? <LoadingScreen /> :
-          isAuthenticated
-            ? (isAdmin ? <Navigate to="/" /> : <Navigate to="/staff-portal" />)
-            : <PageTransition><Login isAdminMode={false} /></PageTransition>
-        }
-      />
+    <Suspense fallback={<LoadingScreen message="Loading page..." />}>
+      <Routes>
+        {/* Smart Root Redirect */}
+        <Route
+          path="/"
+          element={
+            !isAuthenticated ? (
+              <Navigate to="/login" replace />
+            ) : isAdmin ? (
+              <Navigate to="/admin" replace />
+            ) : (
+              <Navigate to="/staff-portal" replace />
+            )
+          }
+        />
 
-      {/* Admin Login — hidden route for administrators */}
-      <Route
-        path="/admin-login"
-        element={
-          loading ? <LoadingScreen /> :
-          isAuthenticated
-            ? (isAdmin ? <Navigate to="/" /> : <Navigate to="/staff-portal" />)
-            : <PageTransition><Login isAdminMode={true} /></PageTransition>
-        }
-      />
+        {/* Staff Login */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? (
+              isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/staff-portal" replace />
+            ) : (
+              <PageTransition>
+                <Login isAdminMode={false} />
+              </PageTransition>
+            )
+          }
+        />
 
-      {/* Staff Portal */}
-      <Route
-        path="/staff-portal"
-        element={
-          <StaffRoute>
-            <PageTransition><StaffPortal /></PageTransition>
-          </StaffRoute>
-        }
-      />
+        {/* Admin Login routes */}
+        <Route
+          path="/admin-login"
+          element={
+            isAuthenticated ? (
+              isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/staff-portal" replace />
+            ) : (
+              <PageTransition>
+                <Login isAdminMode={true} />
+              </PageTransition>
+            )
+          }
+        />
+        <Route
+          path="/admin/login"
+          element={
+            isAuthenticated ? (
+              isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/staff-portal" replace />
+            ) : (
+              <PageTransition>
+                <Login isAdminMode={true} />
+              </PageTransition>
+            )
+          }
+        />
 
-      {/* Admin Dashboard */}
-      <Route path="/" element={<AdminRoute><DashboardLayout /></AdminRoute>}>
-        <Route index element={<PageTransition><Dashboard /></PageTransition>} />
-        <Route path="staff" element={<PageTransition><StaffManagement /></PageTransition>} />
-        <Route path="manual-order" element={<PageTransition><ManualOrder /></PageTransition>} />
-        <Route path="reports" element={<PageTransition><Reports /></PageTransition>} />
-        <Route path="settings" element={<PageTransition><Settings /></PageTransition>} />
-      </Route>
+        {/* Staff Portal */}
+        <Route
+          path="/staff-portal"
+          element={
+            <StaffRoute>
+              <PageTransition>
+                <StaffPortal />
+              </PageTransition>
+            </StaffRoute>
+          }
+        />
 
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
+        {/* Admin Workspace */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <DashboardLayout />
+            </AdminRoute>
+          }
+        >
+          <Route
+            index
+            element={
+              <PageTransition>
+                <Dashboard />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="staff"
+            element={
+              <PageTransition>
+                <StaffManagement />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="manual-order"
+            element={
+              <PageTransition>
+                <ManualOrder />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <PageTransition>
+                <Reports />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="holidays"
+            element={
+              <PageTransition>
+                <Holidays />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <PageTransition>
+                <Settings />
+              </PageTransition>
+            }
+          />
+        </Route>
+
+        {/* Legacy route redirects */}
+        <Route path="/staff" element={<Navigate to="/admin/staff" replace />} />
+        <Route path="/manual-order" element={<Navigate to="/admin/manual-order" replace />} />
+        <Route path="/reports" element={<Navigate to="/admin/reports" replace />} />
+        <Route path="/holidays" element={<Navigate to="/admin/holidays" replace />} />
+        <Route path="/settings" element={<Navigate to="/admin/settings" replace />} />
+
+        {/* Catch-all redirect */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

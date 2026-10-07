@@ -38,6 +38,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const cronRoutes = require('./routes/cronRoutes');
 const staffPortalRoutes = require('./routes/staffPortalRoutes');
+const holidayRoutes = require('./routes/holidayRoutes');
 
 // Root status endpoint
 app.get('/', (req, res) => {
@@ -66,6 +67,7 @@ apiRouter.use('/settings', settingsRoutes);
 apiRouter.use('/dashboard', dashboardRoutes);
 apiRouter.use('/cron', cronRoutes);
 apiRouter.use('/portal', staffPortalRoutes);
+apiRouter.use('/holidays', holidayRoutes);
 apiRouter.use('/', cronRoutes);
 
 app.use('/api', apiRouter);
@@ -84,11 +86,13 @@ const initDatabase = async () => {
     try {
         // Default Settings
         const defaultSettings = [
-            { key: 'bot_token', value: '8702984374:AAH_LxuikY-P6VWDqe7rMPp1RggGih2Mh08' },
-            { key: 'group_id', value: '' },
+            { key: 'bot_token', value: process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || '' },
+            { key: 'group_id', value: process.env.TELEGRAM_GROUP_ID || '' },
             { key: 'order_start_time', value: '07:00' },
             { key: 'order_end_time', value: '16:00' },
-            { key: 'report_time', value: '16:20' }
+            { key: 'report_time', value: '16:20' },
+            { key: 'max_advance_days', value: '7' },
+            { key: 'allow_weekend_orders', value: 'false' }
         ];
 
         for (const setting of defaultSettings) {
@@ -119,6 +123,15 @@ const initDatabase = async () => {
             const hashedPassword = await bcrypt.hash(password, 10);
             await Admin.create({ username, password: hashedPassword });
             console.log(`Admin user '${username}' seeded.`);
+        }
+
+        // Auto-initialize Cambodia 2026 Holidays if empty
+        const Holiday = require('./models/Holiday');
+        const { CAMBODIA_HOLIDAYS_2026 } = require('./utils/cambodiaHolidays2026');
+        const holidayCount = await Holiday.countDocuments();
+        if (holidayCount === 0) {
+            await Holiday.insertMany(CAMBODIA_HOLIDAYS_2026);
+            console.log('Cambodia 2026 public holidays auto-initialized.');
         }
 
         console.log('Database initialized.');

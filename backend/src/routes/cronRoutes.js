@@ -98,7 +98,7 @@ router.get('/tick', verifyCron, async (req, res) => {
             results.supplyReport = `error: ${e.message}`;
         }
 
-        // inside the /tick handler, add:
+        // Run slot-based reminders (07:00, 12:00, 15:00)
         try {
             for (const slot of REMINDER_SLOTS) {
                 await botService.sendSlotReminderIfDue(slot);

@@ -19,5 +19,6 @@ const OrderSchema = new mongoose.Schema({
 });
 
 OrderSchema.index({ user: 1, order_date: 1 }, { unique: true });
+OrderSchema.index({ order_date: 1, status: 1 });
 
 module.exports = mongoose.model('Order', OrderSchema);

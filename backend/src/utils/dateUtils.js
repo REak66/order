@@ -176,11 +176,58 @@ const getDateRange = ({ date, startDate, endDate, period, month }) => {
     };
 };
 
+const getCambodiaTimeComponents = (date = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).formatToParts(date);
+
+    const map = {};
+    parts.forEach(p => { map[p.type] = p.value; });
+
+    return {
+        year: Number(map.year),
+        month: Number(map.month),
+        day: Number(map.day),
+        hour: Number(map.hour),
+        minute: Number(map.minute)
+    };
+};
+
+const addDaysToIso = (isoDate, days) => {
+    const [year, month, day] = isoDate.split('-').map(Number);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    d.setUTCDate(d.getUTCDate() + days);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+};
+
+const getDayOfWeek = (isoDate) => {
+    const [year, month, day] = isoDate.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    return date.getUTCDay();
+};
+
+const checkDateEligibility = (...args) => {
+    const { checkDateEligibility: check } = require('./eligibilityEngine');
+    return check(...args);
+};
+
 module.exports = {
     TIME_ZONE,
     toLocalIsoDate,
     toIsoDate,
     addDays,
+    addDaysToIso,
+    getCambodiaTimeComponents,
+    getDayOfWeek,
     getTomorrowDate,
     getTomorrowIsoDate,
     toDisplayDate,
@@ -195,5 +242,6 @@ module.exports = {
     getMonthlyExportRows,
     getMonthlyDayStatus,
     getDateRange,
-    getLunchDate
+    getLunchDate,
+    checkDateEligibility
 };

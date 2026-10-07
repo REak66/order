@@ -14,14 +14,18 @@ import {
   Sunrise,
   Sun,
   Sunset,
-  Sparkles,
   RefreshCw,
-  Play
+  Calendar,
+  CalendarRange
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { addDays, format, endOfMonth } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 import SearchSelect from '../components/SearchSelect';
 import TimePicker from '../components/TimePicker';
+import SelectDate from '../components/SelectDate';
+import ConfirmModal from '../components/ConfirmModal';
+import { cn } from '../utils/cx';
 
 const normalizeTimeValue = (value) => {
   if (!value) return '';
@@ -60,7 +64,14 @@ const Settings = () => {
     reminder_15_enabled: 'true',
     reminder_15_time: '15:00',
     reminder_15_message_en: '',
-    reminder_15_message_kh: ''
+    reminder_15_message_kh: '',
+
+    // Ordering Horizon & Weekends
+    max_advance_days: '7',
+    allow_weekend_orders: 'false',
+    order_horizon_mode: 'rolling',
+    order_range_start_date: '',
+    order_range_end_date: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,6 +83,14 @@ const Settings = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [activeTab, setActiveTab] = useState('global');
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    variant: 'warning',
+    confirmText: 'Send Report',
+    onConfirm: () => {},
+  });
 
   const tabs = [
     { id: 'global', name: 'Global Settings' },
@@ -91,6 +110,8 @@ const Settings = () => {
       fetchReminderLogs(1);
     }
   }, [activeTab]);
+
+
 
   const fetchSettings = async () => {
     try {
@@ -123,14 +144,14 @@ const Settings = () => {
 
       const adminOpts = adminsRes.data.map(a => ({
         value: `admin-${a._id || a.id}`,
-        label: `🔑 Admin: ${a.username}`,
+        label: `Admin: ${a.username}`,
         rawId: a._id || a.id,
         type: 'admin'
       }));
 
       const staffOpts = staffRes.data.map(s => ({
         value: `staff-${s._id || s.id}`,
-        label: `👤 Staff: ${s.full_name} (${s.username || ''})`,
+        label: `Staff: ${s.full_name} (${s.username || ''})`,
         rawId: s._id || s.id,
         type: 'staff'
       }));
@@ -175,10 +196,7 @@ const Settings = () => {
     }
   };
 
-  const handleSendReportNow = async () => {
-    if (!window.confirm('Are you sure you want to send the daily report(s) to Telegram now?')) {
-      return;
-    }
+  const executeSendReportNow = async () => {
     setSendingReport(true);
     try {
       const res = await api.post('/api/settings/send-now');
@@ -189,6 +207,20 @@ const Settings = () => {
     } finally {
       setSendingReport(false);
     }
+  };
+
+  const handleSendReportNow = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Send Daily Report',
+      message: 'Are you sure you want to send the daily lunch order report(s) to Telegram channels now?',
+      variant: 'warning',
+      confirmText: 'Send Now',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await executeSendReportNow();
+      }
+    });
   };
 
   const handleSendLunchReminder = async (slotKey = null) => {
@@ -286,7 +318,7 @@ const Settings = () => {
   </div>;
 
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="max-w-4xl space-y-6 sm:space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">System Settings</h2>
         <p className="text-slate-500 text-xs sm:text-sm">Configure Telegram bot and system-wide parameters</p>
@@ -381,6 +413,205 @@ const Settings = () => {
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Advance Order Horizon & Weekend Ordering */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="text-primary-500" size={20} />
+                  <div>
+                    <h3 className="font-bold text-slate-800 dark:text-white">Order Horizon & Working Days</h3>
+                    <p className="text-xs text-slate-400">Control multi-date advance ordering window and weekend eligibility</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 sm:p-6 space-y-6">
+                {/* Mode Selector */}
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-white">Order Date Horizon Mode</h4>
+                      <p className="text-xs text-slate-400 mt-0.5">Choose how the available ordering window is calculated for staff</p>
+                    </div>
+                    <div className="inline-flex p-1 bg-slate-200/80 dark:bg-slate-900 rounded-xl border border-slate-300/40 dark:border-slate-800 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, order_horizon_mode: 'rolling' })}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                          (settings.order_horizon_mode || 'rolling') === 'rolling'
+                            ? "bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 shadow-xs font-bold"
+                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                        )}
+                      >
+                        <RefreshCw size={13} className="shrink-0" />
+                        <span>Rolling Advance Days</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, order_horizon_mode: 'date_range' })}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                          settings.order_horizon_mode === 'date_range'
+                            ? "bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 shadow-xs font-bold"
+                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                        )}
+                      >
+                        <CalendarRange size={13} className="shrink-0" />
+                        <span>Fixed Date Range</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode 1: Rolling Advance Days */}
+                {(settings.order_horizon_mode || 'rolling') === 'rolling' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Max Advance Horizon (Days)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
+                        placeholder="e.g. 7"
+                        value={settings.max_advance_days || '7'}
+                        onChange={(e) => setSettings({ ...settings, max_advance_days: e.target.value })}
+                      />
+                      <p className="text-xs text-slate-400">
+                        Users can place orders up to this many days in advance (e.g. 7 allows ordering for the entire upcoming week).
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Weekend Orders (Sat / Sun)
+                      </label>
+                      <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                        <div>
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {settings.allow_weekend_orders === 'true' ? 'Enabled' : 'Disabled (Blocked)'}
+                          </span>
+                          <p className="text-xs text-slate-400">
+                            {settings.allow_weekend_orders === 'true'
+                              ? 'Users can order lunches on Saturdays and Sundays'
+                              : 'Orders on weekends are rejected as non-working days'}
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={settings.allow_weekend_orders === 'true'}
+                            onChange={(e) => setSettings({
+                              ...settings,
+                              allow_weekend_orders: e.target.checked ? 'true' : 'false'
+                            })}
+                          />
+                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Mode 2: Fixed Date Range Window */
+                  <div className="space-y-4">
+                    <div className="p-3.5 rounded-xl bg-primary-50/60 dark:bg-primary-950/30 border border-primary-100 dark:border-primary-900/40 text-xs text-primary-700 dark:text-primary-300 flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={16} className="text-primary-600 dark:text-primary-400 shrink-0" />
+                        <span>Staff in the Staff Portal will only be able to view and order dates inside this specific range.</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-slate-500 dark:text-slate-400 mr-1">Presets:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+                            const end = format(addDays(new Date(), 5), 'yyyy-MM-dd');
+                            setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Next 5 Days
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+                            const end = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+                            setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Next 2 Weeks
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+                            const end = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+                            setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          This Month
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Order Window Start Date *
+                        </label>
+                        <SelectDate
+                          value={settings.order_range_start_date || ''}
+                          onChange={(e) => setSettings({ ...settings, order_range_start_date: e.target.value })}
+                          placeholder="Select start date"
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Order Window End Date *
+                        </label>
+                        <SelectDate
+                          value={settings.order_range_end_date || ''}
+                          onChange={(e) => setSettings({ ...settings, order_range_end_date: e.target.value })}
+                          placeholder="Select end date"
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Weekend Orders (Sat / Sun)
+                        </label>
+                        <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                          <div>
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                              {settings.allow_weekend_orders === 'true' ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              checked={settings.allow_weekend_orders === 'true'}
+                              onChange={(e) => setSettings({
+                                ...settings,
+                                allow_weekend_orders: e.target.checked ? 'true' : 'false'
+                              })}
+                            />
+                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -684,7 +915,7 @@ const Settings = () => {
                   <textarea
                     rows={3}
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
-                    placeholder="អរុណសួស្តីអ្នកទាំងអស់គ្នា! សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃនេះ។ អរគុណ! 🌤️"
+                    placeholder="អរុណសួស្តីអ្នកទាំងអស់គ្នា! សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃនេះ។ អរគុណ!"
                     value={settings.reminder_07_message_kh}
                     onChange={(e) => setSettings({ ...settings, reminder_07_message_kh: e.target.value })}
                   />
@@ -719,7 +950,7 @@ const Settings = () => {
                   <div className="p-3 bg-white dark:bg-slate-900 rounded-lg font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap border border-slate-100 dark:border-slate-800">
                     {(settings.reminder_07_message_en?.trim() || settings.lunch_reminder_message_en?.trim() || 'Good morning everyone!\n\nPlease place your lunch order for today. Thank you!')}
                     {'\n\n'}
-                    {(settings.reminder_07_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'អរុណសួស្តីអ្នកទាំងអស់គ្នា! សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃនេះ។ អរគុណ! 🌤️')}
+                    {(settings.reminder_07_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'អរុណសួស្តីអ្នកទាំងអស់គ្នា! សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃនេះ។ អរគុណ!')}
                   </div>
                 </div>
               </div>
@@ -803,7 +1034,7 @@ const Settings = () => {
                   <textarea
                     rows={3}
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
-                    placeholder="សួស្តីអ្នកទាំងអស់គ្នា! សូមកុំភ្លេចធ្វើការកម្មង់អាហារថ្ងៃត្រង់មុនពេលផុតកំណត់។ អរគុណ! 🍱"
+                    placeholder="សួស្តីអ្នកទាំងអស់គ្នា! សូមកុំភ្លេចធ្វើការកម្មង់អាហារថ្ងៃត្រង់មុនពេលផុតកំណត់។ អរគុណ!"
                     value={settings.reminder_12_message_kh}
                     onChange={(e) => setSettings({ ...settings, reminder_12_message_kh: e.target.value })}
                   />
@@ -838,7 +1069,7 @@ const Settings = () => {
                   <div className="p-3 bg-white dark:bg-slate-900 rounded-lg font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap border border-slate-100 dark:border-slate-800">
                     {(settings.reminder_12_message_en?.trim() || settings.lunch_reminder_message_en?.trim() || 'Hello everyone!\n\nPlease remember to place your lunch order before the cutoff time. Thank you!')}
                     {'\n\n'}
-                    {(settings.reminder_12_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'សួស្តីអ្នកទាំងអស់គ្នា! សូមកុំភ្លេចធ្វើការកម្មង់អាហារថ្ងៃត្រង់មុនពេលផុតកំណត់។ អរគុណ! 🍱')}
+                    {(settings.reminder_12_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'សួស្តីអ្នកទាំងអស់គ្នា! សូមកុំភ្លេចធ្វើការកម្មង់អាហារថ្ងៃត្រង់មុនពេលផុតកំណត់។ អរគុណ!')}
                   </div>
                 </div>
               </div>
@@ -922,7 +1153,7 @@ const Settings = () => {
                   <textarea
                     rows={3}
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
-                    placeholder="សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!😘"
+                    placeholder="សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!"
                     value={settings.reminder_15_message_kh}
                     onChange={(e) => setSettings({ ...settings, reminder_15_message_kh: e.target.value })}
                   />
@@ -957,7 +1188,7 @@ const Settings = () => {
                   <div className="p-3 bg-white dark:bg-slate-900 rounded-lg font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap border border-slate-100 dark:border-slate-800">
                     {(settings.reminder_15_message_en?.trim() || settings.lunch_reminder_message_en?.trim() || 'Hello everyone,\n\nPlease place your lunch order for tomorrow. Thank you!')}
                     {'\n\n'}
-                    {(settings.reminder_15_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!😘')}
+                    {(settings.reminder_15_message_kh?.trim() || settings.lunch_reminder_message_kh?.trim() || 'សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!')}
                   </div>
                 </div>
               </div>
@@ -989,7 +1220,7 @@ const Settings = () => {
                     <textarea
                       rows={3}
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition text-slate-800 dark:text-slate-200 resize-none text-sm"
-                      placeholder="សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!😘"
+                      placeholder="សួស្តីអ្នកទាំងអស់គ្នា សូមធ្វើការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃស្អែក។ អរគុណ!"
                       value={settings.lunch_reminder_message_kh}
                       onChange={(e) => setSettings({ ...settings, lunch_reminder_message_kh: e.target.value })}
                     />
@@ -1144,79 +1375,92 @@ const Settings = () => {
             )}
           </button>
         </div>
+
       </form>
 
-      {/* Reset User / Admin Password Card */}
-      <form
-        onSubmit={handlePasswordSubmit}
-        className="space-y-6 motion-preset-fade motion-duration-200 pt-4"
-      >
-        <div
-          className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
+      {/* Reset User / Admin Password Card - only shown on Global Settings */}
+      {activeTab === 'global' && (
+        <form
+          onSubmit={handlePasswordSubmit}
+          className="space-y-6 motion-preset-fade motion-duration-200 pt-4"
         >
-          <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-            <Lock className="text-rose-500" size={20} />
-            <h3 className="font-bold text-slate-800 dark:text-white">Reset User / Admin Password</h3>
-          </div>
-          <div className="p-4 sm:p-6 space-y-6">
-            {/* User Select Row */}
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Select User Account</label>
-                <SearchSelect
-                  options={accounts}
-                  value={passwordForm.targetUserKey}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, targetUserKey: e.target.value })}
-                  placeholder="Select Admin or Staff user..."
-                  hasSearch={true}
-                  className="w-full font-semibold"
-                />
-              </div>
-            </div>
-
-            {/* Passwords Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">New Password</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition text-slate-800 dark:text-slate-200"
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Confirm New Password</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition text-slate-800 dark:text-slate-200"
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={changingPassword}
-            className="flex items-center gap-2 px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-rose-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center"
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
           >
-            {changingPassword ? 'Resetting...' : (
-              <>
-                <KeyRound size={20} />
-                <span>Reset User Password</span>
-              </>
-            )}
-          </button>
-        </div>
-      </form>
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+              <Lock className="text-rose-500" size={20} />
+              <h3 className="font-bold text-slate-800 dark:text-white">Reset User / Admin Password</h3>
+            </div>
+            <div className="p-4 sm:p-6 space-y-6">
+              {/* User Select Row */}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Select User Account</label>
+                  <SearchSelect
+                    options={accounts}
+                    value={passwordForm.targetUserKey}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, targetUserKey: e.target.value })}
+                    placeholder="Select Admin or Staff user..."
+                    hasSearch={true}
+                    className="w-full font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Passwords Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">New Password</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition text-slate-800 dark:text-slate-200"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Confirm New Password</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition text-slate-800 dark:text-slate-200"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={changingPassword}
+              className="flex items-center gap-2 px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-rose-600/20 cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] w-full sm:w-auto justify-center"
+            >
+              {changingPassword ? 'Resetting...' : (
+                <>
+                  <KeyRound size={20} />
+                  <span>Reset User Password</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

@@ -4,7 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Staff Lunch Order System - Admin</title>
+    <meta name="description" content="Staff Lunch Order Management Portal" />
+    <title>Staff Lunch Order System</title>
+    <script>
+      (function() {
+        const collections = [
+          '$hsOverlayCollection', '$hsComboBoxCollection', '$hsDropdownCollection',
+          '$hsSelectCollection', '$hsCollapseCollection', '$hsAccordionCollection',
+          '$hsTabsCollection', '$hsTooltipCollection', '$hsPinInputCollection',
+          '$hsStepperCollection', '$hsCopyMarkupCollection', '$hsCarouselCollection',
+          '$hsInputNumberCollection', '$hsRemoveElementCollection', '$hsScrollspyCollection',
+          '$hsStrongPasswordCollection', '$hsToggleCountCollection', '$hsTogglePasswordCollection',
+          '$hsTreeViewCollection', '$hsDataTableCollection', '$hsFileUploadCollection',
+          '$hsRangeSliderCollection'
+        ];
+        collections.forEach(function(col) {
+          if (!window[col]) window[col] = [];
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

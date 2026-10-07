@@ -1,17 +1,21 @@
 const User = require('../models/User');
 const Order = require('../models/Order');
 const asyncHandler = require('../utils/asyncHandler');
-const { getExpectedOrderIsoDate } = require('../utils/dateUtils');
+const { getExpectedOrderIsoDate, toLocalIsoDate } = require('../utils/dateUtils');
+const Holiday = require('../models/Holiday');
 
 exports.getStats = asyncHandler(async (req, res) => {
     const lunchDate = getExpectedOrderIsoDate();
     
     const totalStaff = await User.countDocuments();
     const orders = await Order.find({ order_date: lunchDate });
+    const holiday = await Holiday.findOne({ date: lunchDate, is_active: true });
 
     const stats = {
         totalStaff,
         lunchDate,
+        isHoliday: Boolean(holiday),
+        holidayName: holiday ? holiday.name : null,
         ordered: orders.filter(o => o.status === 'ordered').length,
         cancelled: orders.filter(o => o.status === 'cancelled').length,
         notOrdered: 0
@@ -23,14 +27,20 @@ exports.getStats = asyncHandler(async (req, res) => {
 });
 
 exports.getChartData = asyncHandler(async (req, res) => {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 7);
+    const pastDateIso = toLocalIsoDate(pastDate);
+
+    const futureDate = new Date();
+    futureDate.setDate(today.getDate() + 7);
+    const futureDateIso = toLocalIsoDate(futureDate);
+
     const orders = await Order.aggregate([
         {
             $match: {
                 status: 'ordered',
-                created_at: { $gte: sevenDaysAgo }
+                order_date: { $gte: pastDateIso, $lte: futureDateIso }
             }
         },
         {

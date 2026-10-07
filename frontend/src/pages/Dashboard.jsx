@@ -5,7 +5,8 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Palmtree
 } from 'lucide-react';
 import {
   BarChart,
@@ -95,11 +96,20 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Dashboard Overview</h2>
-        <p className="text-slate-500 text-xs sm:text-sm">
-          Real-time lunch order statistics for tomorrow{stats.lunchDate ? ` (${stats.lunchDate})` : ''}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Dashboard Overview</h2>
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+            Real-time lunch order statistics for tomorrow{stats.lunchDate ? ` (${stats.lunchDate})` : ''}
+          </p>
+        </div>
+
+        {stats.isHoliday && (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-xs font-semibold shadow-xs">
+            <Palmtree size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>Public Holiday: <strong>{stats.holidayName}</strong></span>
+          </div>
+        )}
       </div>
 
       <div
@@ -108,15 +118,15 @@ const Dashboard = () => {
         {statCards.map((card, index) => (
           <div
             key={index}
-            className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] hover:shadow-md hover:shadow-slate-100 dark:hover:shadow-none"
+            className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 dark:border-slate-800 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] hover:shadow-md"
           >
             <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <div className={`p-2.5 sm:p-3 rounded-xl text-white ${card.color}`}>
+              <div className={`p-2.5 sm:p-3 rounded-xl text-white ${card.color} shadow-sm`}>
                 <card.icon size={20} className="sm:size-6" />
               </div>
             </div>
             <div className="space-y-0.5 sm:space-y-1">
-              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-800 dark:text-white leading-tight">{card.value}</h3>
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">{card.value}</h3>
               <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">{card.label}</p>
             </div>
           </div>
@@ -124,16 +134,17 @@ const Dashboard = () => {
       </div>
 
       <div
-        className="bg-white dark:bg-slate-900 p-4 sm:p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 motion-preset-fade motion-duration-200 motion-delay-150"
+        className="bg-white dark:bg-slate-900 p-4 sm:p-8 rounded-2xl shadow-xs border border-slate-200/80 dark:border-slate-800 motion-preset-fade motion-duration-200 motion-delay-150"
       >
         <div className="flex items-center gap-2 mb-4 sm:mb-8">
           <TrendingUp className="text-primary-500" />
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white">Last 7 Days Orders</h3>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Last 7 Days Orders</h3>
         </div>
         <div className="h-72 sm:h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 24 }}
               onMouseLeave={() => setHoveredIndex(null)}
             >
               <defs>
@@ -147,8 +158,8 @@ const Dashboard = () => {
                 dataKey="order_date"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
-                dy={10}
+                tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }}
+                dy={6}
                 tickFormatter={(value) => {
                   try {
                     const date = parseISO(value);

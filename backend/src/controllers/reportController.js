@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const Order = require("../models/Order");
+const Holiday = require("../models/Holiday");
 const ExcelJS = require("exceljs");
 const { jsPDF } = require("jspdf");
 require("jspdf-autotable");
@@ -13,6 +14,7 @@ const {
   getMonthlyDayStatus,
   toDisplayDate,
   parseOrderDate,
+  checkDateEligibility,
 } = require("../utils/dateUtils");
 const { STATUSES, SYMBOLS } = require("../utils/constants");
 const botService = require("../services/botService");
@@ -82,14 +84,35 @@ const getReportData = async ({
   const isMonthlyReport = period === "monthly";
   const isSummaryReport = period === "weekly";
 
+  // Pre-index orders for O(1) instant lookups to eliminate expensive nested loops
+  const userOrderDateMap = new Map();
+  const userOrdersMap = new Map();
+  const branchDateOrdersMap = new Map();
+
+  for (const order of orders) {
+    if (!order.user) continue;
+    const userIdStr = order.user._id ? order.user._id.toString() : String(order.user);
+    const key = `${userIdStr}_${order.order_date}`;
+    userOrderDateMap.set(key, order);
+
+    if (!userOrdersMap.has(userIdStr)) {
+      userOrdersMap.set(userIdStr, []);
+    }
+    userOrdersMap.get(userIdStr).push(order);
+
+    const branch = order.user.branch || "";
+    const branchKey = `${branch}_${order.order_date}`;
+    if (!branchDateOrdersMap.has(branchKey)) {
+      branchDateOrdersMap.set(branchKey, []);
+    }
+    branchDateOrdersMap.get(branchKey).push(order);
+  }
+
   if (period === "summary") {
     const sortedUsers = sortSummaryUsers(users);
     return sortedUsers.map((user) => {
-      const userOrders = orders.filter(
-        (order) =>
-          order.user &&
-          order.user._id.toString() === user._id.toString() &&
-          order.status === "ordered",
+      const userOrders = (userOrdersMap.get(user._id.toString()) || []).filter(
+        (order) => order.status === "ordered",
       );
       const totalMeal = userOrders.length;
       const price = getUserPrice(user);
@@ -116,15 +139,11 @@ const getReportData = async ({
     return users.map((user) => {
       const days = {};
       let total = 0;
+      const userIdStr = user._id.toString();
 
       range.dates.forEach((orderDate) => {
         const day = Number(orderDate.split("-")[2]);
-        const order = orders.find(
-          (o) =>
-            o.user &&
-            o.user._id.toString() === user._id.toString() &&
-            o.order_date === orderDate,
-        );
+        const order = userOrderDateMap.get(`${userIdStr}_${orderDate}`);
         const status = order?.status === "ordered" ? "ordered" : "not_ordered";
         days[day] = status;
         if (status === "ordered") total += 1;
@@ -155,12 +174,7 @@ const getReportData = async ({
     return range.dates.flatMap((orderDate) =>
       branches.map((branchName) => {
         const branchUsers = users.filter((user) => user.branch === branchName);
-        const branchOrders = orders.filter(
-          (order) =>
-            order.user &&
-            order.user.branch === branchName &&
-            order.order_date === orderDate,
-        );
+        const branchOrders = branchDateOrdersMap.get(`${branchName}_${orderDate}`) || [];
         const ordered = branchOrders.filter(
           (order) => order.status === "ordered",
         ).length;
@@ -183,12 +197,7 @@ const getReportData = async ({
 
   let results = range.dates.flatMap((orderDate) =>
     users.map((user) => {
-      const order = orders.find(
-        (o) =>
-          o.user &&
-          o.user._id.toString() === user._id.toString() &&
-          o.order_date === orderDate,
-      );
+      const order = userOrderDateMap.get(`${user._id.toString()}_${orderDate}`);
 
       return {
         report_type: "detail",
@@ -223,12 +232,22 @@ exports.getLunchReports = asyncHandler(async (req, res) => {
 });
 
 exports.upsertManualOrder = asyncHandler(async (req, res) => {
-  const { userId, orderDate, status = "ordered", branch } = req.body;
+  const { userId, orderDate, orderDates, status = "ordered", branch, overrideStandby = false } = req.body;
 
-  if (!userId || !orderDate || !/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) {
+  const datesToProcess = Array.isArray(orderDates) && orderDates.length > 0 
+    ? orderDates 
+    : (orderDate ? [orderDate] : []);
+
+  if (!userId || datesToProcess.length === 0) {
     return res
       .status(400)
-      .json({ message: "Staff and order date are required" });
+      .json({ message: "Staff and at least one order date are required" });
+  }
+
+  for (const d of datesToProcess) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      return res.status(400).json({ message: `Invalid date format: ${d}` });
+    }
   }
 
   if (!STATUSES.includes(status)) {
@@ -239,10 +258,15 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Invalid branch" });
   }
 
-  if (status === "cancelled" && orderDate !== toLocalIsoDate()) {
-    return res
-      .status(400)
-      .json({ message: "Cancel order is allowed only for today." });
+  const todayIso = toLocalIsoDate();
+
+  // Validate past dates (cannot modify past dates)
+  for (const d of datesToProcess) {
+    if (d < todayIso) {
+      return res
+        .status(400)
+        .json({ message: `Cannot modify orders for past date: ${d}` });
+    }
   }
 
   const user = await User.findById(userId);
@@ -257,90 +281,119 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
     await user.save();
   }
 
-  if (status === "not_ordered") {
-    const existingOrder = await Order.findOne({
-      user: userId,
-      order_date: orderDate,
-    });
-    const previousStatus = existingOrder?.status;
+  // If ordering (not cancelling/clearing) and admin has not overridden standby, check public holiday eligibility
+  if (status === "ordered" && !overrideStandby) {
+    for (const d of datesToProcess) {
+      const eligibility = await checkDateEligibility({
+        targetDate: d,
+        user,
+        isAdminOverride: false
+      });
 
-    await Order.findOneAndDelete({ user: userId, order_date: orderDate });
-
-    if (previousStatus === "ordered") {
-      try {
-        await botService.sendCancellationNotification(user, {
-          order_date: orderDate,
+      if (!eligibility.eligible && eligibility.isHoliday) {
+        return res.status(400).json({
+          message: eligibility.message,
+          reason: eligibility.reason,
+          isHoliday: true,
+          holidayName: eligibility.holidayName,
+          date: d,
+          requiresConfirmation: true
         });
-      } catch (error) {
-        console.error(
-          "Failed to send cancellation notification:",
-          error.message,
-        );
       }
     }
-
-    try {
-      await botService.sendDailyReportUpdate(user, orderDate, oldBranch);
-    } catch (error) {
-      console.error("Failed to send daily report update:", error.message);
-    }
-
-    try {
-      await botService.sendSupplyReportUpdate(orderDate);
-    } catch (error) {
-      console.error("Failed to send supply report update:", error.message);
-    }
-
-    return res.json({ message: "Manual order cleared", user });
   }
 
-  // Check if order already exists
-  const existingOrder = await Order.findOne({
-    user: userId,
-    order_date: orderDate,
+  const results = [];
+
+  for (const currentOrderDate of datesToProcess) {
+    if (status === "not_ordered") {
+      const existingOrder = await Order.findOne({
+        user: userId,
+        order_date: currentOrderDate,
+      });
+      const previousStatus = existingOrder?.status;
+
+      await Order.findOneAndDelete({ user: userId, order_date: currentOrderDate });
+
+      if (previousStatus === "ordered") {
+        try {
+          await botService.sendCancellationNotification(user, {
+            order_date: currentOrderDate,
+          });
+        } catch (error) {
+          console.error("Failed to send cancellation notification:", error.message);
+        }
+      }
+
+      try {
+        await botService.sendDailyReportUpdate(user, currentOrderDate, oldBranch);
+      } catch (error) {
+        console.error("Failed to send daily report update:", error.message);
+      }
+
+      try {
+        await botService.sendSupplyReportUpdate(currentOrderDate);
+      } catch (error) {
+        console.error("Failed to send supply report update:", error.message);
+      }
+
+      results.push({ orderDate: currentOrderDate, status: "not_ordered" });
+    } else {
+      const existingOrder = await Order.findOne({
+        user: userId,
+        order_date: currentOrderDate,
+      });
+      const isNewOrder = !existingOrder;
+      const previousStatus = existingOrder?.status;
+
+      const order = await Order.findOneAndUpdate(
+        { user: userId, order_date: currentOrderDate },
+        { status },
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
+      );
+
+      if (status === "ordered" && (isNewOrder || previousStatus !== "ordered")) {
+        try {
+          await botService.sendOrderNotification(user, order);
+        } catch (error) {
+          console.error("Failed to send order notification:", error.message);
+        }
+      }
+
+      if (status === "cancelled" && previousStatus !== "cancelled") {
+        try {
+          await botService.sendCancellationNotification(user, order);
+        } catch (error) {
+          console.error("Failed to send cancellation notification:", error.message);
+        }
+      }
+
+      try {
+        await botService.sendDailyReportUpdate(user, currentOrderDate, oldBranch);
+      } catch (error) {
+        console.error("Failed to send daily report update:", error.message);
+      }
+
+      try {
+        await botService.sendSupplyReportUpdate(currentOrderDate);
+      } catch (error) {
+        console.error("Failed to send supply report update:", error.message);
+      }
+
+      results.push({ orderDate: currentOrderDate, status, order });
+    }
+  }
+
+  res.json({
+    message: status === "ordered"
+      ? "Manual order saved"
+      : status === "cancelled"
+        ? "Manual cancel saved"
+        : "Manual order cleared",
+    results,
+    order: results[0]?.order || null,
+    user
   });
-  const isNewOrder = !existingOrder;
-  const previousStatus = existingOrder?.status;
-
-  const order = await Order.findOneAndUpdate(
-    { user: userId, order_date: orderDate },
-    { status },
-    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
-  );
-
-  // Send Telegram notification if order is placed or status changed to 'ordered'
-  if (status === "ordered" && (isNewOrder || previousStatus !== "ordered")) {
-    try {
-      await botService.sendOrderNotification(user, order);
-    } catch (error) {
-      console.error("Failed to send order notification:", error.message);
-      // Don't fail the request if notification fails
-    }
-  }
-
-  // Send Telegram notification if order is cancelled
-  if (status === "cancelled" && previousStatus !== "cancelled") {
-    try {
-      await botService.sendCancellationNotification(user, order);
-    } catch (error) {
-      console.error("Failed to send cancellation notification:", error.message);
-      // Don't fail the request if notification fails
-    }
-  }
-
-  try {
-    await botService.sendDailyReportUpdate(user, orderDate, oldBranch);
-  } catch (error) {
-    console.error("Failed to send daily report update:", error.message);
-  }
-
-  try {
-    await botService.sendSupplyReportUpdate(orderDate);
-  } catch (error) {
-    console.error("Failed to send supply report update:", error.message);
-  }
-
-  res.json({ message: "Manual order saved", order, user });
 });
 
 const getSummaryDateHeader = (startDate, endDate) => {
@@ -397,6 +450,17 @@ exports.exportExcel = asyncHandler(async (req, res) => {
       getMonthlyReportMeta(month, branch);
     const monthlyRows = getMonthlyExportRows(reportData);
 
+    const monthIsoPrefix = toLocalIsoDate(targetDate).slice(0, 7);
+    const monthHolidays = await Holiday.find({
+      date: { $regex: `^${monthIsoPrefix}` },
+      is_active: true,
+    });
+    const holidayDayMap = {};
+    monthHolidays.forEach((h) => {
+      const d = parseInt(h.date.split("-")[2], 10);
+      holidayDayMap[d] = h.name;
+    });
+
     const columns = [
       { header: "No", key: "no", width: 6 },
       { header: "Name", key: "full_name", width: 22 },
@@ -436,6 +500,23 @@ exports.exportExcel = asyncHandler(async (req, res) => {
       vertical: "middle",
     };
 
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      if (holidayDayMap[day]) {
+        const headerCell = worksheet.getRow(2).getCell(3 + day);
+        headerCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFC7CE" }, // Soft peach/red for holidays
+        };
+        headerCell.font = {
+          bold: true,
+          size: 11,
+          name: "Times New Roman",
+          color: { argb: "FF9C0006" },
+        };
+      }
+    }
+
     worksheet.getRow(1).height = 32;
     worksheet.getRow(2).height = 28;
 
@@ -468,8 +549,8 @@ exports.exportExcel = asyncHandler(async (req, res) => {
           cell.fill = {
             type: "pattern",
             pattern: "solid",
-            fgColor: { argb: "FFE2EFDA" },
-          }; // soft green
+            fgColor: holidayDayMap[day] ? { argb: "FFD9E1F2" } : { argb: "FFE2EFDA" }, // soft blue/purple on holidays, soft green on normal
+          };
         } else if (status === "not_ordered") {
           cell.fill = {
             type: "pattern",
@@ -920,6 +1001,17 @@ exports.exportPDF = asyncHandler(async (req, res) => {
       getMonthlyReportMeta(month, branch);
     const monthlyRows = getMonthlyExportRows(reportData);
 
+    const monthIsoPrefix = toLocalIsoDate(getMonthDate(month)).slice(0, 7);
+    const monthHolidays = await Holiday.find({
+      date: { $regex: `^${monthIsoPrefix}` },
+      is_active: true,
+    });
+    const holidayDayMap = {};
+    monthHolidays.forEach((h) => {
+      const d = parseInt(h.date.split("-")[2], 10);
+      holidayDayMap[d] = h.name;
+    });
+
     const head = [
       [
         "No",
@@ -1041,6 +1133,19 @@ exports.exportPDF = asyncHandler(async (req, res) => {
         [totalCostColumnIndex]: { cellWidth: 14 },
       },
       didParseCell: (data) => {
+        if (
+          data.section === "head" &&
+          data.column.index >= dayColumnStart &&
+          data.column.index <= dayColumnEnd
+        ) {
+          const day = data.column.index - dayColumnStart + 1;
+          if (holidayDayMap[day]) {
+            data.cell.styles.fillColor = [255, 199, 206]; // soft peach/red
+            data.cell.styles.textColor = [156, 0, 6];
+          }
+          return;
+        }
+
         const isBottomRow = data.row.index === body.length - 1;
 
         if (data.section === "body" && isBottomRow) {
@@ -1062,7 +1167,7 @@ exports.exportPDF = asyncHandler(async (req, res) => {
           const status = getMonthlyDayStatus(sourceRow, day, cutoffDay);
 
           if (status === "ordered") {
-            data.cell.styles.fillColor = [226, 239, 218]; // soft green
+            data.cell.styles.fillColor = holidayDayMap[day] ? [217, 225, 242] : [226, 239, 218];
             data.cell.text = ["1"];
           } else if (status === "not_ordered") {
             data.cell.styles.fillColor = [252, 228, 214]; // soft orange/red

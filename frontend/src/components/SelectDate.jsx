@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -7,7 +8,8 @@ import 'cally';
 
 /**
  * Reusable premium SelectDate component powered by Cally Web Components.
- * Supports date formatting, custom styling, React controlled state, min/max restrictions, and smooth animations.
+ * Supports date formatting, custom styling, React controlled state, min/max restrictions,
+ * and portal rendering so dropdown is never clipped by overflow-hidden containers.
  */
 const SelectDate = ({
   value = '',
@@ -17,18 +19,71 @@ const SelectDate = ({
   min = '',
   max = '',
   placeholder = 'Select date',
+  align = 'left',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
   const containerRef = useRef(null);
+  const dropdownRef = useRef(null);
   const calendarRef = useRef(null);
 
-  // Close calendar when clicking outside
+  // Position calculation relative to viewport
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const popupWidth = 310;
+    const popupHeight = 350;
+
+    // Determine if space below is limited
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpwards = spaceBelow < popupHeight && rect.top > popupHeight;
+
+    const top = openUpwards
+      ? Math.max(8, rect.top - popupHeight - 8)
+      : Math.min(window.innerHeight - popupHeight - 8, rect.bottom + 8);
+
+    let left = align === 'right'
+      ? rect.right - popupWidth
+      : rect.left;
+
+    // Keep within horizontal window bounds
+    if (left + popupWidth > window.innerWidth - 12) {
+      left = window.innerWidth - popupWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    setCoords({ top, left });
+  }, [align]);
+
+  // Update position on open, scroll, or resize
+  useEffect(() => {
+    if (!isOpen) return;
+
+    updatePosition();
+    const handleScrollOrResize = () => updatePosition();
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen, updatePosition]);
+
+  // Close calendar when clicking outside (checks both container button & portal dropdown)
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      const isInsideContainer = containerRef.current && containerRef.current.contains(event.target);
+      const isInsideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
+
+      if (!isInsideContainer && !isInsideDropdown) {
         setIsOpen(false);
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
@@ -87,35 +142,44 @@ const SelectDate = ({
         <ChevronDown size={16} className="text-slate-400 dark:text-slate-500 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }} />
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute z-50 mt-2 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl left-0 right-0 sm:right-auto sm:left-0 w-auto sm:w-[310px] max-w-[calc(100vw-2rem)]"
-          >
-            <calendar-date
-              ref={calendarRef}
-              value={value}
-              min={min || undefined}
-              max={max || undefined}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              ref={dropdownRef}
+              initial={{ opacity: 0, y: 8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.96 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              style={{
+                position: 'fixed',
+                top: `${coords.top}px`,
+                left: `${coords.left}px`,
+                zIndex: 99999,
+              }}
+              className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl w-[310px] max-w-[calc(100vw-1.5rem)] text-slate-900 dark:text-white"
             >
-              <svg aria-label="Previous" slot="previous" className="size-4 text-slate-500 dark:text-slate-400 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M15.75 19.5 8.25 12l7.5-7.5" />
-              </svg>
-              <svg aria-label="Next" slot="next" className="size-4 text-slate-500 dark:text-slate-400 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path fill="currentColor" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-              </svg>
-              <calendar-month />
-            </calendar-date>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <calendar-date
+                ref={calendarRef}
+                value={value}
+                min={min || undefined}
+                max={max || undefined}
+              >
+                <svg aria-label="Previous" slot="previous" className="size-4 text-slate-700 dark:text-slate-300 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+                <svg aria-label="Next" slot="next" className="size-4 text-slate-700 dark:text-slate-300 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+                <calendar-month />
+              </calendar-date>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
 
 export default SelectDate;
-

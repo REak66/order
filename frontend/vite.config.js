@@ -8,8 +8,19 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
   },
   build: {
-    outDir: '../dist',        // output to project root /dist (for Vercel)
+    outDir: '../dist', // output to project root /dist (for Vercel)
     emptyOutDir: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['framer-motion', 'lucide-react', 'react-hot-toast'],
+          'vendor-charts': ['recharts'],
+          'vendor-xlsx': ['xlsx'],
+        },
+      },
+    },
   },
   server: {
     proxy: {
@@ -20,4 +31,3 @@ export default defineConfig({
     },
   },
 })
-

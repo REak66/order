@@ -3,6 +3,7 @@ const cron = require('node-cron');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Setting = require('../models/Setting');
+const Holiday = require('../models/Holiday');
 const ReminderLog = require('../models/ReminderLog');
 const { BRANCHES, SYMBOLS, BRANCH_ALIASES } = require('../utils/constants');
 const {
@@ -11,7 +12,8 @@ const {
     toDisplayDate,
     toOrderInputDate,
     getExpectedOrderIsoDate,
-    getLunchDate
+    getLunchDate,
+    checkDateEligibility
 } = require('../utils/dateUtils');
 require('dotenv').config();
 
@@ -222,7 +224,13 @@ const buildDailyReport = async (date = new Date()) => {
     const displayDate = isoToDisplayDate(orderDate);
     const { branchData, totalSum } = await fetchReportData(orderDate);
 
-    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
+    const holiday = await Holiday.findOne({ date: orderDate, is_active: true });
+    let holidayBanner = '';
+    if (holiday) {
+        holidayBanner = `📢 របាយការណ៍កម្ម៉ង់បាយថ្ងៃបុណ្យ (Standby Staff Only)\n🎉 ${holiday.name}\n\n`;
+    }
+
+    let report = `${holidayBanner}សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
 
     const branchReports = branchData.map(({ branch, orderedUsers, count }) => {
         let text = `📍 ${branch.reportLabel}: ${count} នាក់\n\n`;
@@ -248,7 +256,13 @@ const buildDailySum = async (date = new Date()) => {
     const displayDate = isoToDisplayDate(orderDate);
     const { branchData, totalSum } = await fetchReportData(orderDate);
 
-    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
+    const holiday = await Holiday.findOne({ date: orderDate, is_active: true });
+    let holidayBanner = '';
+    if (holiday) {
+        holidayBanner = `📢 របាយការណ៍កម្ម៉ង់បាយថ្ងៃបុណ្យ (Standby Staff Only)\n🎉 ${holiday.name}\n\n`;
+    }
+
+    let report = `${holidayBanner}សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
 
     const branchReports = branchData.map(({ branch, orderedUsers, count }) => {
         let text = `📍 ${branch.reportLabel}: ${count} នាក់`;
@@ -274,11 +288,17 @@ const buildDailyReportForBranch = async (branchName, date = new Date()) => {
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
     const branch = BRANCHES.find(b => b.name === branchName) || { name: branchName, reportLabel: branchName };
 
+    const holiday = await Holiday.findOne({ date: orderDate, is_active: true });
+    let holidayBanner = '';
+    if (holiday) {
+        holidayBanner = `📢 របាយការណ៍កម្ម៉ង់បាយថ្ងៃបុណ្យ (Standby Staff Only)\n🎉 ${holiday.name}\n\n`;
+    }
+
     const orderedUserIds = new Set(orders.map(o => o.user.toString()));
     const orderedUsers = users.filter(u => orderedUserIds.has(u._id.toString()));
     const count = orderedUsers.length;
 
-    let report = `សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
+    let report = `${holidayBanner}សូមពិនិត្យមើលឈ្មោះអ្នកដែលបានកម្មង់បាយ សម្រាប់ថ្ងៃទី ${displayDate}\n\n`;
     report += `📍 ${branch.reportLabel}: ${count} នាក់\n\n`;
     report += count === 0
         ? 'មិនមានអ្នកកម្មង់\n\n'
@@ -428,14 +448,254 @@ const restart = async () => {
     return launch();
 };
 
+const parseBranchFromText = (text) => {
+    if (!text) return null;
+    if (/city\s*mall/i.test(text)) return 'City Mall';
+    if (/6a/i.test(text)) return 'BYD 6A';
+    if (/60m/i.test(text)) return 'BYD 60M';
+    return null;
+};
+
+const extractNameFromText = (text) => {
+    if (!text) return null;
+    const match = text.match(/(?:-\s*)?(?:name|ឈ្មោះ)\s*[:=]\s*([^\n\r,]+)/i);
+    return match ? match[1].trim() : null;
+};
+
+const extractBranchFromText = (text) => {
+    if (!text) return null;
+    const match = text.match(/(?:-\s*)?(?:brand|branch|សាខា)\s*[:=]\s*([^\n\r,]+)/i);
+    if (match) {
+        return parseBranchFromText(match[1].trim());
+    }
+    return parseBranchFromText(text);
+};
+
+const extractDatesFromText = (text) => {
+    const dates = [];
+    if (!text) return dates;
+    
+    // Look for DD-MM-YYYY or DD/MM/YYYY
+    const dmyRegex = /\b(\d{1,2})[-/](\d{1,2})[-/](\d{4})\b/g;
+    let match;
+    while ((match = dmyRegex.exec(text)) !== null) {
+        const dd = match[1].padStart(2, '0');
+        const mm = match[2].padStart(2, '0');
+        const yyyy = match[3];
+        dates.push(`${yyyy}-${mm}-${dd}`);
+    }
+
+    // Look for YYYY-MM-DD
+    const ymdRegex = /\b(\d{4})[-/](\d{1,2})[-/](\d{1,2})\b/g;
+    while ((match = ymdRegex.exec(text)) !== null) {
+        const yyyy = match[1];
+        const mm = match[2].padStart(2, '0');
+        const dd = match[3].padStart(2, '0');
+        dates.push(`${yyyy}-${mm}-${dd}`);
+    }
+
+    return [...new Set(dates)];
+};
+
+const isOrderMessage = (text) => {
+    if (!text || typeof text !== 'string') return false;
+    const lower = text.toLowerCase();
+    return lower.includes('order on') ||
+           (lower.includes('order') && (lower.includes('name') || lower.includes('ឈ្មោះ'))) ||
+           lower.includes('កម្មង់') ||
+           (lower.includes('- name') && (lower.includes('brand') || lower.includes('branch')));
+};
+
 // ─── Bot Handlers ─────────────────────────────────────────────────────────────
 
 const registerHandlers = (telegramBot) => {
     telegramBot.catch((error, ctx) => {
         console.error(`Telegram update ${ctx.update?.update_id || 'unknown'} error:`, error.message);
     });
+
     telegramBot.command('chatid', async (ctx) => {
         return ctx.reply(`លេខសម្គាល់ក្រុម Chat ID: ${ctx.chat.id}`);
+    });
+
+    telegramBot.command('holidays', async (ctx) => {
+        try {
+            const today = toLocalIsoDate();
+            const holidays = await Holiday.find({ date: { $gte: today }, is_active: true })
+                .sort({ date: 1 })
+                .limit(10);
+
+            if (holidays.length === 0) {
+                return ctx.reply('🏖️ មិនមានថ្ងៃឈប់សម្រាកបុណ្យជាតិខាងមុខទេ (No upcoming holidays).');
+            }
+
+            let msg = '🏖️ កាលវិភាគថ្ងៃឈប់សម្រាកបុណ្យជាតិខាងមុខ (Upcoming Holidays):\n\n';
+            holidays.forEach((h, i) => {
+                msg += `${i + 1}. 📅 ${toOrderInputDate(h.date)}: ${h.name}\n`;
+            });
+            msg += '\n📌 សម្គាល់: ថ្ងៃឈប់សម្រាកបុណ្យជាតិ មានតែបុគ្គលិក Standby ប៉ុណ្ណោះដែលអាចកម្មង់បាយបាន។';
+            return ctx.reply(msg);
+        } catch (error) {
+            console.error('Bot /holidays error:', error.message);
+            return ctx.reply('Error fetching holidays.');
+        }
+    });
+
+    telegramBot.command('standby', async (ctx) => {
+        try {
+            if (!ctx.from?.id) return ctx.reply('Unknown user.');
+            const user = await User.findOne({ telegram_id: ctx.from.id });
+            if (!user) {
+                return ctx.reply('❌ គណនីរបស់អ្នកមិនទាន់បានភ្ជាប់ជាមួយប្រព័ន្ធទេ។ សូមទាក់ទង Admin។');
+            }
+            const statusText = user.is_standby
+                ? '✅ សកម្ម (Active - អាចកម្មង់បាយនៅថ្ងៃបុណ្យជាតិបាន)'
+                : '❌ មិនសកម្ម (Inactive - មិនអនុញ្ញាតឱ្យកម្មង់នៅថ្ងៃបុណ្យជាតិទេ)';
+
+            return ctx.reply(
+                `👤 ឈ្មោះ: ${user.full_name}\n` +
+                `🏢 សាខា: ${user.branch}\n` +
+                `🛡️ ស្ថានភាព Standby Duty: ${statusText}`
+            );
+        } catch (error) {
+            console.error('Bot /standby error:', error.message);
+            return ctx.reply('Error checking standby status.');
+        }
+    });
+
+    telegramBot.on('text', async (ctx) => {
+        const text = ctx.message?.text;
+        if (!text || text.startsWith('/')) return;
+        if (!isOrderMessage(text)) return;
+
+        try {
+            // 1. Resolve User
+            let user = null;
+            const extractedName = extractNameFromText(text);
+
+            if (ctx.from?.id) {
+                user = await User.findOne({ telegram_id: ctx.from.id });
+            }
+
+            if (!user && extractedName) {
+                user = await User.findOne({
+                    full_name: new RegExp(`^${extractedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+                });
+                if (!user) {
+                    user = await User.findOne({
+                        full_name: new RegExp(extractedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+                    });
+                }
+            }
+
+            if (!user) {
+                return ctx.reply(
+                    `❌ មិនស្គាល់គណនីរបស់អ្នកទេ (Unknown staff).\n\n` +
+                    `សូមប្រាកដថាអ្នកបានបញ្ជាក់ឈ្មោះត្រឹមត្រូវ ដូចជា:\n` +
+                    `- Name : [ឈ្មោះពេញរបស់អ្នក]\n` +
+                    `- Brand : BYD 6A\n` +
+                    `- Order on DD-MM-YYYY ✅`,
+                    { reply_to_message_id: ctx.message.message_id }
+                );
+            }
+
+            // Auto-bind telegram_id if not linked
+            if (!user.telegram_id && ctx.from?.id) {
+                user.telegram_id = ctx.from.id;
+                await user.save();
+            }
+
+            // 2. Resolve & Update Branch
+            const extractedBranch = extractBranchFromText(text);
+            const oldBranch = user.branch;
+            if (extractedBranch && extractedBranch !== user.branch) {
+                user.branch = extractedBranch;
+                await user.save();
+            }
+
+            // 3. Check Ordering Hours Window
+            const inBranchWindow = user.branch ? await isBranchOrderingAllowed(user.branch) : await isOrderingAllowed();
+            if (!inBranchWindow) {
+                return ctx.reply(
+                    `⏰ ម៉ោងនៃការកម្មង់បាយបានបិទហើយ (ក្រៅម៉ោងកំណត់)។\n` +
+                    `Ordering window is currently closed for ${user.branch || 'all branches'}.`,
+                    { reply_to_message_id: ctx.message.message_id }
+                );
+            }
+
+            // 4. Extract Target Dates
+            let dates = extractDatesFromText(text);
+            if (dates.length === 0) {
+                dates = [getExpectedOrderIsoDate()];
+            }
+
+            // 5. Validate eligibility & place orders
+            const results = [];
+            const successfulDates = [];
+
+            for (const targetDate of dates) {
+                const displayDate = toOrderInputDate(targetDate);
+                const eligibility = await checkDateEligibility({
+                    targetDate,
+                    user,
+                    isAdminOverride: false
+                });
+
+                if (!eligibility.eligible) {
+                    if (eligibility.reason === 'holiday_standby_only') {
+                        results.push(`• ${displayDate}: 🚫 ${eligibility.holidayName || 'ថ្ងៃឈប់សម្រាកបុណ្យជាតិ'} (សម្រាប់តែបុគ្គលិក Standby)`);
+                    } else if (eligibility.reason === 'past_date') {
+                        results.push(`• ${displayDate}: ❌ មិនអាចកម្មង់កាលបរិច្ឆេទកន្លងផុត`);
+                    } else if (eligibility.reason === 'weekend_closed') {
+                        results.push(`• ${displayDate}: ❌ ថ្ងៃឈប់សម្រាកចុងសប្តាហ៍ (មិនមានការកម្មង់)`);
+                    } else if (eligibility.reason === 'exceeds_horizon') {
+                        results.push(`• ${displayDate}: ❌ មិនទាន់បើកឱ្យកម្មង់នៅឡើយទេ`);
+                    } else {
+                        results.push(`• ${displayDate}: ❌ ${eligibility.message}`);
+                    }
+                    continue;
+                }
+
+                const isManagement = isManagementPosition(user.position);
+                const food_type = isManagement ? 'Chinese Food' : 'Chinese Food';
+
+                await Order.findOneAndUpdate(
+                    { user: user._id, order_date: targetDate },
+                    { status: 'ordered', food_type },
+                    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+                );
+
+                results.push(`• ${displayDate}: ជោគជ័យ ✅`);
+                successfulDates.push(targetDate);
+            }
+
+            // 6. Build and send reply
+            const hasSuccess = successfulDates.length > 0;
+            const replyHeader = hasSuccess
+                ? `✅ បានកក់អាហារថ្ងៃត្រង់ជោគជ័យ:`
+                : `⚠️ មិនអាចកក់អាហារថ្ងៃត្រង់បានទេ:`;
+
+            const replyMsg =
+                `${replyHeader}\n` +
+                `👤 ឈ្មោះ: ${user.full_name}\n` +
+                `🏢 សាខា: ${user.branch}\n\n` +
+                `លទ្ធផលនៃការកម្មង់:\n` +
+                results.join('\n');
+
+            await ctx.reply(replyMsg, { reply_to_message_id: ctx.message.message_id });
+
+            // 7. Update reports
+            for (const sDate of successfulDates) {
+                try {
+                    await sendDailyReportUpdate(user, sDate, oldBranch);
+                    await sendSupplyReportUpdate(sDate);
+                } catch (reportErr) {
+                    console.error(`Report update error for ${sDate}:`, reportErr.message);
+                }
+            }
+        } catch (err) {
+            console.error('Error handling order text:', err.message);
+            await ctx.reply(`❌ មានបញ្ហាបច្ចេកទេសក្នុងការកត់ត្រាការកម្មង់: ${err.message}`);
+        }
     });
 };
 

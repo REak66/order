@@ -1,7 +1,9 @@
 const User = require('../models/User');
+const Order = require('../models/Order');
 const Position = require('../models/Position');
 const Department = require('../models/Department');
 const asyncHandler = require('../utils/asyncHandler');
+const { toLocalIsoDate } = require('../utils/dateUtils');
 const bcrypt = require('bcryptjs');
 
 exports.getAllStaff = asyncHandler(async (req, res) => {
@@ -10,7 +12,7 @@ exports.getAllStaff = asyncHandler(async (req, res) => {
 });
 
 exports.addStaff = asyncHandler(async (req, res) => {
-    const { username, full_name, branch, password, byd_id, hx_id, position, department } = req.body;
+    const { username, full_name, branch, password, byd_id, hx_id, position, department, is_standby } = req.body;
 
     if (!username || !username.trim()) {
         return res.status(400).json({ message: 'Username is required' });
@@ -38,6 +40,7 @@ exports.addStaff = asyncHandler(async (req, res) => {
         branch,
         password: hashedPassword,
         is_first_login: true,
+        is_standby: Boolean(is_standby),
         byd_id: byd_id || '',
         hx_id: hx_id || '',
         position: position || '',
@@ -48,7 +51,7 @@ exports.addStaff = asyncHandler(async (req, res) => {
 
 exports.updateStaff = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { username, full_name, branch, password, byd_id, hx_id, position, department } = req.body;
+    const { username, full_name, branch, password, byd_id, hx_id, position, department, is_standby } = req.body;
 
     if (!username || !username.trim()) {
         return res.status(400).json({ message: 'Username is required' });
@@ -75,6 +78,10 @@ exports.updateStaff = asyncHandler(async (req, res) => {
         department: department || ''
     };
 
+    if (is_standby !== undefined) {
+        updateData.is_standby = Boolean(is_standby);
+    }
+
     if (password && password.trim() !== '') {
         updateData.password = await bcrypt.hash(password, 10);
         updateData.is_first_login = true;
@@ -88,9 +95,25 @@ exports.updateStaff = asyncHandler(async (req, res) => {
     res.json(staff);
 });
 
+exports.toggleStandby = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { is_standby } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+        return res.status(404).json({ message: 'Staff not found' });
+    }
+
+    user.is_standby = is_standby !== undefined ? Boolean(is_standby) : !user.is_standby;
+    await user.save();
+    res.json(user);
+});
+
 exports.deleteStaff = asyncHandler(async (req, res) => {
     const { id } = req.params;
     await User.findByIdAndDelete(id);
+    // Clean up future orders to prevent orphaned orders in reports
+    await Order.deleteMany({ user: id, order_date: { $gte: toLocalIsoDate() } });
     res.json({ message: 'Staff deleted' });
 });
 
@@ -213,12 +236,18 @@ exports.importStaffBulk = asyncHandler(async (req, res) => {
         }
 
         // Create user
+        const isStandbyVal = member.is_standby === true ||
+            String(member.is_standby).toLowerCase() === 'true' ||
+            String(member.is_standby).toLowerCase() === 'yes' ||
+            member.is_standby === 1;
+
         await User.create({
             username: normalizedUsername,
             full_name: String(full_name).trim(),
             branch: normalizedBranch,
             password: hashedPassword,
             is_first_login: true,
+            is_standby: isStandbyVal,
             byd_id: byd_id ? String(byd_id).trim() : '',
             hx_id: hx_id ? String(hx_id).trim() : '',
             position: position ? String(position).trim() : '',

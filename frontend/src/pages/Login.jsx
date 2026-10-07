@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { LogIn, ShieldCheck, ChevronRight } from 'lucide-react';
+import ThemeToggle from '../components/ThemeToggle';
 
 const Login = ({ isAdminMode = false }) => {
   // Admin form
@@ -23,7 +24,7 @@ const Login = ({ isAdminMode = false }) => {
     try {
       await login(username, password);
       toast.success('Welcome back, Admin!');
-      navigate('/');
+      navigate('/admin');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed');
     } finally {
@@ -46,15 +47,20 @@ const Login = ({ isAdminMode = false }) => {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 px-4 overflow-hidden">
+    <div className="relative min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 py-8 sm:p-6 overflow-hidden transition-colors duration-300">
+      {/* Top right Theme Toggle */}
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
+
       {/* Decorative background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[10%] left-[5%] w-72 h-72 md:w-[450px] md:h-[450px] rounded-full bg-primary-400/20 dark:bg-primary-900/10 blur-[80px] md:blur-[120px]" />
-        <div className="absolute bottom-[10%] right-[5%] w-72 h-72 md:w-[450px] md:h-[450px] rounded-full bg-pink-400/15 dark:bg-violet-900/10 blur-[80px] md:blur-[120px]" />
+        <div className="absolute top-[5%] left-[5%] w-72 h-72 md:w-[500px] md:h-[500px] rounded-full bg-primary-400/15 dark:bg-primary-900/10 blur-[80px] md:blur-[120px]" />
+        <div className="absolute bottom-[5%] right-[5%] w-72 h-72 md:w-[500px] md:h-[500px] rounded-full bg-amber-400/10 dark:bg-violet-900/10 blur-[80px] md:blur-[120px]" />
       </div>
 
       {/* Glass card */}
-      <div className="relative z-10 max-w-md w-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-slate-800/80 overflow-hidden motion-preset-fade motion-duration-200">
+      <div className="relative z-10 w-full max-w-md bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-hidden motion-preset-fade motion-duration-200">
         <div className="p-6 sm:p-8 md:p-10">
 
           {/* Logo */}
@@ -76,14 +82,14 @@ const Login = ({ isAdminMode = false }) => {
             <div className="motion-preset-fade motion-duration-200">
               <form onSubmit={handleStaffLogin} className="space-y-5 motion-preset-fade motion-duration-200">
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  <label htmlFor="staff-username" className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                     Username
                   </label>
                   <input
                     id="staff-username"
                     type="text"
                     required
-                    className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950/50 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-slate-800 dark:text-slate-200 shadow-sm focus:scale-[1.01]"
+                    className="w-full px-4 py-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-white/90 dark:bg-slate-950/60 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-slate-900 dark:text-slate-100 text-base sm:text-sm shadow-xs"
                     placeholder="Enter your username"
                     value={staffUsername}
                     onChange={(e) => setStaffUsername(e.target.value)}
@@ -91,14 +97,14 @@ const Login = ({ isAdminMode = false }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  <label htmlFor="staff-password" className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                     Password
                   </label>
                   <input
                     id="staff-password"
                     type="password"
                     required
-                    className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950/50 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-slate-800 dark:text-slate-200 shadow-sm focus:scale-[1.01]"
+                    className="w-full px-4 py-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-white/90 dark:bg-slate-950/60 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-slate-900 dark:text-slate-100 text-base sm:text-sm shadow-xs"
                     placeholder="••••••••"
                     value={staffPassword}
                     onChange={(e) => setStaffPassword(e.target.value)}
@@ -108,7 +114,7 @@ const Login = ({ isAdminMode = false }) => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 px-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl shadow-lg shadow-primary-600/25 transition-all hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-center gap-2 text-sm md:text-base cursor-pointer"
+                  className="w-full py-4 px-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl shadow-lg shadow-primary-600/25 transition-all hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-center gap-2 text-base cursor-pointer"
                 >
                   {isSubmitting ? 'Signing in...' : (
                     <>Sign In <ChevronRight size={18} /></>
@@ -120,14 +126,14 @@ const Login = ({ isAdminMode = false }) => {
             /* ── ADMIN TAB (Hidden Route) ── */
             <form onSubmit={handleAdminSubmit} className="space-y-6 motion-preset-fade motion-duration-200">
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <label htmlFor="admin-username" className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Username
                 </label>
                 <input
                   id="admin-username"
                   type="text"
                   required
-                  className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950/50 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-slate-800 dark:text-slate-200 shadow-sm focus:scale-[1.01]"
+                  className="w-full px-4 py-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-white/90 dark:bg-slate-950/60 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-slate-900 dark:text-slate-100 text-base sm:text-sm shadow-xs"
                   placeholder="admin"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -135,14 +141,14 @@ const Login = ({ isAdminMode = false }) => {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <label htmlFor="admin-password" className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Password
                 </label>
                 <input
                   id="admin-password"
                   type="password"
                   required
-                  className="w-full px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950/50 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-slate-800 dark:text-slate-200 shadow-sm focus:scale-[1.01]"
+                  className="w-full px-4 py-3.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-white/90 dark:bg-slate-950/60 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-slate-900 dark:text-slate-100 text-base sm:text-sm shadow-xs"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

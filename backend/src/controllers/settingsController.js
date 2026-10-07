@@ -35,7 +35,14 @@ const DEFAULT_SETTINGS = {
     reminder_15_time: '15:00',
     reminder_15_message_en: '',
     reminder_15_message_kh: '',
-    reminder_15_message: ''
+    reminder_15_message: '',
+
+    // Ordering Horizon & Weekend Options
+    max_advance_days: '7',
+    allow_weekend_orders: 'false',
+    order_horizon_mode: 'rolling', // 'rolling' or 'date_range'
+    order_range_start_date: '',
+    order_range_end_date: ''
 };
 
 const TIME_SETTING_KEYS = ['order_start_time', 'order_end_time', 'report_time'];
@@ -99,6 +106,21 @@ exports.updateSettings = asyncHandler(async (req, res) => {
                 settings[key] = normalizedGroupId;
             }
         }
+    }
+
+    if (settings.order_range_start_date && !/^\d{4}-\d{2}-\d{2}$/.test(settings.order_range_start_date)) {
+        return res.status(400).json({ message: 'order_range_start_date must be in YYYY-MM-DD format' });
+    }
+    if (settings.order_range_end_date && !/^\d{4}-\d{2}-\d{2}$/.test(settings.order_range_end_date)) {
+        return res.status(400).json({ message: 'order_range_end_date must be in YYYY-MM-DD format' });
+    }
+    if (
+        settings.order_horizon_mode === 'date_range' &&
+        settings.order_range_start_date &&
+        settings.order_range_end_date &&
+        settings.order_range_start_date > settings.order_range_end_date
+    ) {
+        return res.status(400).json({ message: 'order_range_start_date cannot be after order_range_end_date' });
     }
 
     // Fetch existing settings to detect changes in times

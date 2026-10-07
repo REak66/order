@@ -1,12 +1,16 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Old Database URI
-const SOURCE_URI = 'mongodb+srv://reakzyy6:ll2pjc0At4H7H59J@reak.qfaviy1.mongodb.net/lunch_order_db?appName=reak';
-// New Database URI (defaults to your updated .env variable)
-const TARGET_URI = process.env.MONGO_URI || 'mongodb+srv://nit:dbnit@pro1.94ek7pg.mongodb.net/order?appName=pro1';
+// Source & Target Database URIs from environment variables
+const SOURCE_URI = process.env.MIGRATION_SOURCE_URI || process.env.OLD_MONGO_URI || '';
+const TARGET_URI = process.env.MONGO_URI || process.env.MIGRATION_TARGET_URI || '';
 
 async function migrate() {
+    if (!SOURCE_URI || !TARGET_URI) {
+        console.error('❌ Error: Both MIGRATION_SOURCE_URI and MONGO_URI environment variables must be defined to run migration.');
+        process.exit(1);
+    }
+
     console.log('========================================');
     console.log('   STARTING MIGRATION (OLD DB -> NEW DB)');
     console.log('========================================');

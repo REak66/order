@@ -15,6 +15,7 @@ router.post('/departments', authMiddleware, staffController.addDepartment);
 router.delete('/departments/:name', authMiddleware, staffController.deleteDepartment);
 
 router.put('/:id', authMiddleware, staffController.updateStaff);
+router.patch('/:id/standby', authMiddleware, staffController.toggleStandby);
 router.delete('/:id', authMiddleware, staffController.deleteStaff);
 
 module.exports = router;
