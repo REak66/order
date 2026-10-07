@@ -43,7 +43,9 @@ const Settings = () => {
     report_time: '',
     supply_bot_token: '',
     supply_group_id: '',
+    supply_schedule_frequency: '1',
     supply_report_time: '',
+    supply_report_time_2: '',
     supply_custom_message: '',
     lunch_reminder_enabled: 'false',
     lunch_reminder_time: '15:00',
@@ -118,7 +120,7 @@ const Settings = () => {
       const res = await api.get('/api/settings');
       const normalizedData = {};
       Object.keys(res.data).forEach(key => {
-        if (key.endsWith('_time')) {
+        if (key.endsWith('_time') || key.endsWith('_time_2')) {
           normalizedData[key] = normalizeTimeValue(res.data[key]);
         } else {
           normalizedData[key] = res.data[key];
@@ -772,24 +774,144 @@ const Settings = () => {
 
             {/* Supply Schedule Config */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                <Clock className="text-emerald-500" size={20} />
-                <h3 className="font-bold text-slate-800 dark:text-white">Auto Send Schedule</h3>
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="text-emerald-500" size={20} />
+                  <div>
+                    <h3 className="font-bold text-slate-800 dark:text-white">Auto Send Schedule</h3>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                      Configure automated daily reports sent to the supplier Telegram group.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Frequency Segmented Control */}
+                <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, supply_schedule_frequency: '1' })}
+                    className={cn(
+                      'px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all',
+                      (settings.supply_schedule_frequency || '1') === '1'
+                        ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                    )}
+                  >
+                    1 Time / Day
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, supply_schedule_frequency: '2' })}
+                    className={cn(
+                      'px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all',
+                      settings.supply_schedule_frequency === '2'
+                        ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                    )}
+                  >
+                    2 Times / Day
+                  </button>
+                </div>
               </div>
-              <div className="p-4 sm:p-6 space-y-4">
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  Set a time to automatically send the supplier order summary daily. Leave empty to disable auto-send.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Auto Send Time</label>
+
+              <div className="p-4 sm:p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  {/* Slot 1 */}
+                  <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                          1
+                        </span>
+                        <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {settings.supply_schedule_frequency === '2' ? '1st Auto Send (Round 1)' : 'Daily Auto Send Time'}
+                        </label>
+                      </div>
+                      <span className={cn(
+                        'text-[10px] font-medium px-2 py-0.5 rounded-full',
+                        settings.supply_report_time
+                          ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                      )}>
+                        {settings.supply_report_time ? `Active at ${settings.supply_report_time}` : 'Disabled'}
+                      </span>
+                    </div>
                     <TimePicker
                       value={settings.supply_report_time}
                       onChange={(e) => setSettings({ ...settings, supply_report_time: e.target.value })}
                     />
-                    <span className="text-[10px] sm:text-xs text-slate-400 block mt-1">
-                      {settings.supply_report_time ? `Auto-send enabled at ${settings.supply_report_time}` : 'Disabled — use manual "Send to Supplier" button'}
-                    </span>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {settings.supply_schedule_frequency === '2'
+                        ? 'Preliminary order count (e.g. morning preparation estimate).'
+                        : 'Daily cutoff time to send supplier summary.'}
+                    </p>
+                  </div>
+
+                  {/* Slot 2 (Shown if 2 Times / Day is selected) */}
+                  {settings.supply_schedule_frequency === '2' ? (
+                    <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3 motion-preset-fade">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 text-xs font-bold">
+                            2
+                          </span>
+                          <label className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                            2nd Auto Send (Round 2)
+                          </label>
+                        </div>
+                        <span className={cn(
+                          'text-[10px] font-medium px-2 py-0.5 rounded-full',
+                          settings.supply_report_time_2
+                            ? 'bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300'
+                            : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                        )}>
+                          {settings.supply_report_time_2 ? `Active at ${settings.supply_report_time_2}` : 'Disabled'}
+                        </span>
+                      </div>
+                      <TimePicker
+                        value={settings.supply_report_time_2}
+                        onChange={(e) => setSettings({ ...settings, supply_report_time_2: e.target.value })}
+                      />
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                        Final order cutoff count sent before delivery (Round 2 / លើកទី ២).
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center text-slate-400 dark:text-slate-500 p-6 space-y-2">
+                      <Clock size={24} className="opacity-40" />
+                      <div className="text-xs font-medium">Single Daily Send Active</div>
+                      <p className="text-[11px] max-w-xs">
+                        Switch to <button type="button" onClick={() => setSettings({ ...settings, supply_schedule_frequency: '2' })} className="text-emerald-500 underline font-semibold">2 Times / Day</button> to configure morning and afternoon cutoff rounds.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Summary Banner */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-start gap-3">
+                  <AlertCircle size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <div className="text-xs text-slate-600 dark:text-slate-300 space-y-0.5">
+                    {settings.supply_schedule_frequency === '2' ? (
+                      settings.supply_report_time && settings.supply_report_time_2 ? (
+                        <p>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">2-Round Schedule:</span> Bot will automatically send <span className="font-semibold">Round 1 at {settings.supply_report_time}</span> and <span className="font-semibold">Round 2 at {settings.supply_report_time_2}</span>.
+                        </p>
+                      ) : (
+                        <p className="text-amber-600 dark:text-amber-400">
+                          Please specify both Time 1 and Time 2 to enable both daily rounds.
+                        </p>
+                      )
+                    ) : (
+                      settings.supply_report_time ? (
+                        <p>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">1-Time Schedule:</span> Bot will automatically send daily summary at <span className="font-semibold">{settings.supply_report_time}</span>.
+                        </p>
+                      ) : (
+                        <p className="text-slate-500 dark:text-slate-400">
+                          Auto-send is disabled. Use the manual &quot;Send to Supplier&quot; button to send whenever needed.
+                        </p>
+                      )
+                    )}
                   </div>
                 </div>
               </div>

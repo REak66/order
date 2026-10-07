@@ -325,7 +325,7 @@ const isManagementPosition = (position) => {
  * Builds the Supplier Order Summary message with Management counts.
  * Shared between the manual "Send to Supply" button and the auto-send cron.
  */
-const buildSupplyOrderSummary = async (orderDate) => {
+const buildSupplyOrderSummary = async (orderDate, options = {}) => {
     const users = await User.find({});
     const orders = await Order.find({ order_date: orderDate, status: 'ordered' });
 
@@ -355,7 +355,8 @@ const buildSupplyOrderSummary = async (orderDate) => {
     const [year, month, day] = orderDate.split('-');
     const displayDate = `${day}/${month}/${year}`;
 
-    let message = `📦 Lunch Order Report For : ${displayDate}\n\n`;
+    const roundTag = options?.roundLabel ? ` (${options.roundLabel})` : '';
+    let message = `📦 Lunch Order Report${roundTag} For : ${displayDate}\n\n`;
     for (const b of branchTotals) {
         message += `+ BYD ${b.label} TOTAL = ${b.total} psc\n`;
         message += `      - Khmer Food = ${b.khmer} psc\n`;
@@ -753,51 +754,99 @@ const syncGroupMuteState = async () => {
 
 // ─── Message Replace Helper ──────────────────────────────────────────────────────
 
+/** Extracts ISO date (YYYY-MM-DD) from report text or display string if available. */
+const extractDateFromText = (text) => {
+    if (!text || typeof text !== 'string') return null;
+    const dmyMatch = text.match(/(\d{2})[/-](\d{2})[/-](\d{4})/);
+    if (dmyMatch) {
+        const [, day, month, year] = dmyMatch;
+        return `${year}-${month}-${day}`;
+    }
+    const isoMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+    if (isoMatch) return isoMatch[1];
+    return null;
+};
+
 /**
- * Deletes the previously stored report message for a group (if any),
- * then sends a new message and persists the new message_id.
+ * Deletes the previously stored report message for a group ONLY IF
+ * it belongs to the same target date, then sends a new message and persists the new message_id.
+ * If the previous message was for a different date, it is NOT deleted,
+ * ensuring Telegram chat history retains past reports.
+ *
+ * @param {object} runningBot - Telegraf bot instance
+ * @param {string|number} groupId - Telegram group ID
+ * @param {string} text - Message text to send
+ * @param {string|null} parseMode - Optional parse_mode (e.g. 'Markdown' or 'HTML')
+ * @param {string} stateKey - Base state key (default: `last_msg_id_${groupId}`)
+ * @param {string|null} targetDate - ISO date string (YYYY-MM-DD) the message applies to
  */
 const replaceGroupMessage = async (
     runningBot,
     groupId,
     text,
     parseMode = null,
-    stateKey = `last_msg_id_${groupId}`
+    stateKey = `last_msg_id_${groupId}`,
+    targetDate = null
 ) => {
-    const lastMsgId = await getPersistentState(stateKey);
+    const effectiveDate = targetDate || extractDateFromText(text) || getExpectedOrderIsoDate();
+    const dateScopedKey = `${stateKey}_${effectiveDate}`;
+    const legacyDateKey = `${stateKey}_date`;
+
+    // 1. Look for existing message ID specifically for this date
+    let lastMsgId = await getPersistentState(dateScopedKey);
+    let matchedSource = 'date_scoped';
+
+    // Fallback: check legacy un-scoped state key, but ONLY if its stored date matches effectiveDate!
+    if (!lastMsgId) {
+        const lastMsgDate = await getPersistentState(legacyDateKey);
+        if (lastMsgDate === effectiveDate) {
+            lastMsgId = await getPersistentState(stateKey);
+            matchedSource = 'legacy_matching_date';
+        }
+    }
 
     if (lastMsgId) {
         try {
             await runningBot.telegram.deleteMessage(groupId, Number(lastMsgId));
-            console.log(`[replace] Deleted old message ${lastMsgId} in group ${groupId}`);
+            console.log(`[replace] Deleted old message ${lastMsgId} for date ${effectiveDate} in group ${groupId} (${matchedSource})`);
         } catch (err) {
-            // If the message is already gone (deleted by someone else or expired),
+            // If the message is already gone (deleted by someone else or expired >48h),
             // clear the stale ID so future sends don't retry the same bad reference.
             const isStale = err.message && (
                 err.message.includes('message to delete not found') ||
-                err.message.includes('MESSAGE_ID_INVALID')
+                err.message.includes('MESSAGE_ID_INVALID') ||
+                err.message.includes("message can't be deleted")
             );
             if (isStale) {
                 console.warn(`[replace] Stale msg ${lastMsgId} in ${groupId} — clearing stored ID.`);
-                await setPersistentState(stateKey, '');
+                await setPersistentState(dateScopedKey, '');
+                if (matchedSource === 'legacy_matching_date') {
+                    await setPersistentState(stateKey, '');
+                    await setPersistentState(legacyDateKey, '');
+                }
             } else {
                 console.warn(`[replace] Could not delete msg ${lastMsgId} in ${groupId}:`, err.message);
             }
         }
     } else {
-        console.log(`[replace] No previous message stored for group ${groupId}, sending fresh.`);
+        console.log(`[replace] No previous message stored for date ${effectiveDate} in group ${groupId}. Sending fresh (retaining prior dates).`);
     }
 
     const opts = parseMode ? { parse_mode: parseMode } : {};
     const sent = await runningBot.telegram.sendMessage(groupId, text, opts);
+
+    // Save under date-scoped key, base key, and track date
+    await setPersistentState(dateScopedKey, String(sent.message_id));
     await setPersistentState(stateKey, String(sent.message_id));
-    console.log(`[replace] Stored new message_id ${sent.message_id} for group ${groupId}`);
+    await setPersistentState(legacyDateKey, effectiveDate);
+
+    console.log(`[replace] Stored new message_id ${sent.message_id} for date ${effectiveDate} in group ${groupId}`);
     return sent;
 };
 
 // ─── Scheduled Messaging ──────────────────────────────────────────────────────
 
-const sendDailyReport = async () => {
+const sendDailyReport = async (date = new Date()) => {
     const runningBot = await getRunningBot();
     if (!runningBot) return false;
 
@@ -805,8 +854,9 @@ const sendDailyReport = async () => {
     if (!groupId) return false;
 
     try {
-        const report = await buildDailyReport();
-        await replaceGroupMessage(runningBot, groupId, report);
+        const orderDate = resolveOrderDate(date);
+        const report = await buildDailyReport(orderDate);
+        await replaceGroupMessage(runningBot, groupId, report, null, `last_msg_id_${groupId}`, orderDate);
         return true;
     } catch (error) {
         console.error('Report error:', error.message);
@@ -831,6 +881,7 @@ const sendDailyReportIfDue = async () => {
     if (!runningBot) return;
 
     const today = toLocalIsoDate();
+    const orderDate = getExpectedOrderIsoDate();
 
     // 1. Branch reports
     for (const branch of BRANCHES) {
@@ -842,8 +893,8 @@ const sendDailyReportIfDue = async () => {
         const branchKey = branch.name.toLowerCase().replace(/\s+/g, '_');
 
         await runIfDueToday(settingMinutes, `last_report_date_${branchKey}`, today, async () => {
-            const report = await buildDailyReportForBranch(branch.name);
-            await replaceGroupMessage(runningBot, branchGroupId, report);
+            const report = await buildDailyReportForBranch(branch.name, orderDate);
+            await replaceGroupMessage(runningBot, branchGroupId, report, null, `last_msg_id_${branchGroupId}`, orderDate);
             console.log(`Sent daily report for branch ${branch.name} to group ${branchGroupId}`);
         });
     }
@@ -853,8 +904,8 @@ const sendDailyReportIfDue = async () => {
     if (mainGroupId) {
         const mainMinutes = parseTimeToMinutes(await getSettingValue('report_time'));
         await runIfDueToday(mainMinutes, 'last_report_date', today, async () => {
-            const report = await buildDailyReport();
-            await replaceGroupMessage(runningBot, mainGroupId, report);
+            const report = await buildDailyReport(orderDate);
+            await replaceGroupMessage(runningBot, mainGroupId, report, null, `last_msg_id_${mainGroupId}`, orderDate);
             console.log(`Sent main daily report to group ${mainGroupId}`);
         });
     }
@@ -970,19 +1021,49 @@ const sendSlotReminderIfDue = async (slot) => {
 };
 
 /**
- * Auto-sends the Supplier Order Summary if the configured supply_report_time
- * has been reached and it hasn't been sent today yet.
+ * Auto-sends the Supplier Order Summary if configured auto-send schedule
+ * (1 time per day or 2 times per day) has been reached and hasn't been sent today yet.
  */
 const sendSupplyReportIfDue = async () => {
-    const supplyReportTime = await getSettingValue('supply_report_time');
-    if (!supplyReportTime) return; // auto-send disabled
+    const frequency = (await getSettingValue('supply_schedule_frequency')) || '1';
+    const time1 = await getSettingValue('supply_report_time');
+    const time2 = await getSettingValue('supply_report_time_2');
 
-    const settingMinutes = parseTimeToMinutes(supplyReportTime);
-    if (settingMinutes === null) return;
+    const slots = [];
+    if (time1) {
+        slots.push({
+            slot: 1,
+            time: time1,
+            stateKey: 'last_supply_report_slot1_date',
+            legacyStateKey: 'last_supply_report_date',
+            roundLabel: frequency === '2' ? 'Round 1 / លើកទី ១' : ''
+        });
+    }
+    if (frequency === '2' && time2) {
+        slots.push({
+            slot: 2,
+            time: time2,
+            stateKey: 'last_supply_report_slot2_date',
+            roundLabel: 'Round 2 / លើកទី ២'
+        });
+    }
+
+    if (slots.length === 0) return;
 
     const today = toLocalIsoDate();
 
-    await runIfDueToday(settingMinutes, 'last_supply_report_date', today, async () => {
+    for (const slotItem of slots) {
+        const settingMinutes = parseTimeToMinutes(slotItem.time);
+        if (settingMinutes === null) continue;
+
+        let alreadySent = (await getPersistentState(slotItem.stateKey)) === today;
+        if (!alreadySent && slotItem.legacyStateKey) {
+            alreadySent = (await getPersistentState(slotItem.legacyStateKey)) === today;
+        }
+        if (alreadySent) continue;
+
+        if (getLocalMinutes() < settingMinutes) continue;
+
         const { Telegraf } = require('telegraf');
 
         const supplyBotToken = (await getSettingValue('supply_bot_token'))?.trim();
@@ -994,22 +1075,25 @@ const sendSupplyReportIfDue = async () => {
         }
 
         const orderDate = getLunchDate();
-        const message = await buildSupplyOrderSummary(orderDate);
+        const message = await buildSupplyOrderSummary(orderDate, { roundLabel: slotItem.roundLabel });
 
         try {
             const supplyBot = new Telegraf(supplyBotToken);
-            await replaceGroupMessage(
-                supplyBot,
-                supplyGroupId,
-                message,
-                null,
-                'last_supply_message_id'
-            );
-            console.log(`[SupplyAutoSend] Sent supplier order summary to group ${supplyGroupId}`);
+            // Send new message directly to keep all rounds visible without deleting previous messages
+            const sent = await supplyBot.telegram.sendMessage(supplyGroupId, message);
+            const slotMsgKey = `last_supply_message_id_slot${slotItem.slot}`;
+            await setPersistentState(slotMsgKey, String(sent.message_id));
+            await setPersistentState('last_supply_message_id', String(sent.message_id));
+
+            await setPersistentState(slotItem.stateKey, today);
+            if (slotItem.legacyStateKey) {
+                await setPersistentState(slotItem.legacyStateKey, today);
+            }
+            console.log(`[SupplyAutoSend] Sent supplier order summary (${slotItem.roundLabel || 'Slot ' + slotItem.slot}) to group ${supplyGroupId} (Message ID: ${sent.message_id})`);
         } catch (error) {
             console.error('[SupplyAutoSend] Failed to send supply message:', error.message);
         }
-    });
+    }
 };
 
 // ─── Lunch Order Reminder ─────────────────────────────────────────────────────
@@ -1130,12 +1214,12 @@ const sendToGroups = async (runningBot, mainGroupId, branchGroupId, message) => 
  * Sends an updated report to both the branch and main group,
  * replacing (deleting) the previous report message in each group.
  */
-const sendReportToGroups = async (runningBot, mainGroupId, branchGroupId, report) => {
+const sendReportToGroups = async (runningBot, mainGroupId, branchGroupId, report, orderDate = null) => {
     if (branchGroupId) {
-        await replaceGroupMessage(runningBot, branchGroupId, report);
+        await replaceGroupMessage(runningBot, branchGroupId, report, null, `last_msg_id_${branchGroupId}`, orderDate);
     }
     if (mainGroupId && mainGroupId !== branchGroupId) {
-        await replaceGroupMessage(runningBot, mainGroupId, report);
+        await replaceGroupMessage(runningBot, mainGroupId, report, null, `last_msg_id_${mainGroupId}`, orderDate);
     }
 };
 
@@ -1165,13 +1249,13 @@ const sendNotification = async (user, order, buildHeader) => {
         const inGlobalWindow = await isOrderingAllowed();
 
         if (branchGroupId && !inBranchWindow) {
-            await replaceGroupMessage(runningBot, branchGroupId, report);
+            await replaceGroupMessage(runningBot, branchGroupId, report, null, `last_msg_id_${branchGroupId}`, orderDate);
         } else if (branchGroupId) {
             console.log(`[Notification] Skipped daily report update for branch group ${branchGroupId} during ordering window.`);
         }
 
         if (mainGroupId && mainGroupId !== branchGroupId && !inGlobalWindow) {
-            await replaceGroupMessage(runningBot, mainGroupId, report);
+            await replaceGroupMessage(runningBot, mainGroupId, report, null, `last_msg_id_${mainGroupId}`, orderDate);
         } else if (mainGroupId && mainGroupId !== branchGroupId) {
             console.log(`[Notification] Skipped daily report update for main group ${mainGroupId} during ordering window.`);
         }
@@ -1241,7 +1325,7 @@ const sendBranchUpdateNotification = async (user, order, oldBranch = null) => {
             }
 
             if (!inWindow) {
-                await replaceGroupMessage(runningBot, gid, fullReport);
+                await replaceGroupMessage(runningBot, gid, fullReport, null, `last_msg_id_${gid}`, orderDate);
             } else {
                 console.log(`[Notification] Skipped daily report update for group ${gid} during ordering window.`);
             }
@@ -1273,16 +1357,26 @@ const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
 
     /**
      * Returns true if the daily report for this group has already been
-     * sent today and thus needs to be re-sent with updated data.
+     * sent and thus needs to be re-sent with updated data.
      */
     const hasReportBeenSent = async (oDate, branchName = null) => {
-        if (oDate < lunchDate) return true;
-        if (oDate !== lunchDate) return false;
+        // 1. If target date is the expected lunch date, check whether scheduled report was sent today
+        if (oDate === lunchDate) {
+            const stateKey = branchName
+                ? `last_report_date_${branchName.toLowerCase().replace(/\s+/g, '_')}`
+                : 'last_report_date';
+            return (await getPersistentState(stateKey)) === today;
+        }
 
-        const stateKey = branchName
-            ? `last_report_date_${branchName.toLowerCase().replace(/\s+/g, '_')}`
-            : 'last_report_date';
-        return (await getPersistentState(stateKey)) === today;
+        // 2. If target date is today's lunch date (or an active tracked date),
+        // check if a message was already posted for this date
+        const gid = branchName ? await getBranchGroupId(branchName) : await getGroupId();
+        if (gid) {
+            const msgForDate = await getPersistentState(`last_msg_id_${gid}_${oDate}`);
+            if (msgForDate) return true;
+        }
+
+        return false;
     };
 
     const mainGroupId = await getGroupId();
@@ -1294,7 +1388,7 @@ const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
         if (!inWindow) {
             try {
                 const report = await buildDailyReport(orderDate);
-                await replaceGroupMessage(runningBot, mainGroupId, report);
+                await replaceGroupMessage(runningBot, mainGroupId, report, null, `last_msg_id_${mainGroupId}`, orderDate);
                 console.log(`Sent updated main report for date ${orderDate} to group ${mainGroupId}`);
             } catch (error) {
                 console.error('Error sending main report update:', error.message);
@@ -1313,7 +1407,7 @@ const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
             if (!inWindow) {
                 try {
                     const report = await buildDailyReportForBranch(user.branch, orderDate);
-                    await replaceGroupMessage(runningBot, newBranchGroupId, report);
+                    await replaceGroupMessage(runningBot, newBranchGroupId, report, null, `last_msg_id_${newBranchGroupId}`, orderDate);
                     console.log(`Sent updated report for branch ${user.branch} to group ${newBranchGroupId}`);
                 } catch (error) {
                     console.error(`Error sending branch report update for ${user.branch}:`, error.message);
@@ -1333,7 +1427,7 @@ const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
             if (!inWindow) {
                 try {
                     const report = await buildDailyReportForBranch(oldBranch, orderDate);
-                    await replaceGroupMessage(runningBot, oldBranchGroupId, report);
+                    await replaceGroupMessage(runningBot, oldBranchGroupId, report, null, `last_msg_id_${oldBranchGroupId}`, orderDate);
                     console.log(`Sent updated report for old branch ${oldBranch} to group ${oldBranchGroupId}`);
                 } catch (error) {
                     console.error(`Error sending report update for old branch ${oldBranch}:`, error.message);
@@ -1359,10 +1453,13 @@ const sendSupplyReportUpdate = async (orderDate) => {
     const lunchDate = getLunchDate();
     if (orderDate !== lunchDate) return;
 
-    // Check whether the auto-send has already fired today
+    // Check whether any auto-send has already fired today
     const today = toLocalIsoDate();
-    const lastSent = await getPersistentState('last_supply_report_date');
-    if (lastSent !== today) return; // cron hasn't sent yet – it will pick up fresh data on its own
+    const sentSlot1 = (await getPersistentState('last_supply_report_slot1_date')) === today;
+    const sentSlot2 = (await getPersistentState('last_supply_report_slot2_date')) === today;
+    const sentLegacy = (await getPersistentState('last_supply_report_date')) === today;
+
+    if (!sentSlot1 && !sentSlot2 && !sentLegacy) return; // cron hasn't sent yet – it will pick up fresh data on its own
 
     const supplyBotToken = (await getSettingValue('supply_bot_token'))?.trim();
     const supplyGroupId = (await getSettingValue('supply_group_id'))?.trim();
@@ -1373,18 +1470,50 @@ const sendSupplyReportUpdate = async (orderDate) => {
     }
 
     try {
-        const message = await buildSupplyOrderSummary(orderDate);
+        const frequency = (await getSettingValue('supply_schedule_frequency')) || '1';
+        let roundLabel = '';
+        let targetMsgKey = 'last_supply_message_id';
+
+        if (frequency === '2') {
+            if (sentSlot2) {
+                roundLabel = 'Round 2 / លើកទី ២';
+                targetMsgKey = 'last_supply_message_id_slot2';
+            } else {
+                roundLabel = 'Round 1 / លើកទី ១';
+                targetMsgKey = 'last_supply_message_id_slot1';
+            }
+        } else {
+            targetMsgKey = 'last_supply_message_id_slot1';
+        }
+
+        const message = await buildSupplyOrderSummary(orderDate, { roundLabel });
         const supplyBot = new Telegraf(supplyBotToken);
-        await replaceGroupMessage(
-            supplyBot,
-            supplyGroupId,
-            message,
-            null,
-            'last_supply_message_id'
-        );
-        console.log(`[SupplyUpdate] Replaced supplier summary for ${orderDate} in group ${supplyGroupId}`);
+
+        let targetMsgId = await getPersistentState(targetMsgKey);
+        if (!targetMsgId) {
+            targetMsgId = await getPersistentState('last_supply_message_id');
+        }
+
+        if (targetMsgId) {
+            try {
+                // Edit the existing message in-place without deleting it
+                await supplyBot.telegram.editMessageText(
+                    supplyGroupId,
+                    Number(targetMsgId),
+                    undefined,
+                    message
+                );
+                console.log(`[SupplyUpdate] Edited supplier message ${targetMsgId} in-place for ${orderDate} in group ${supplyGroupId}`);
+            } catch (editErr) {
+                if (editErr.message && editErr.message.includes('message is not modified')) {
+                    console.log(`[SupplyUpdate] Message ${targetMsgId} content unchanged.`);
+                } else {
+                    console.warn(`[SupplyUpdate] Could not edit message ${targetMsgId} in-place:`, editErr.message);
+                }
+            }
+        }
     } catch (error) {
-        console.error('[SupplyUpdate] Failed to replace supply message:', error.message);
+        console.error('[SupplyUpdate] Failed to update supply message:', error.message);
     }
 };
 

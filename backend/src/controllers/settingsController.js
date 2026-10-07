@@ -11,7 +11,9 @@ const DEFAULT_SETTINGS = {
     report_time: '16:20',
     supply_bot_token: '',
     supply_group_id: '',
+    supply_schedule_frequency: '1',
     supply_report_time: '',
+    supply_report_time_2: '',
     lunch_reminder_enabled: 'false',
     lunch_reminder_time: '15:00',
     lunch_reminder_message_en: '',
@@ -168,11 +170,24 @@ exports.updateSettings = asyncHandler(async (req, res) => {
         }
     }
 
-    // If supply_report_time was changed, clear last_supply_report_date to allow re-triggering
+    // If supply_report_time was changed, clear last_supply_report_date and slot1 to allow re-triggering
     const oldSupplyReportTime = existingSettings.find(s => s.key === 'supply_report_time')?.value || '';
     if (settings.supply_report_time !== undefined && settings.supply_report_time !== oldSupplyReportTime) {
         await Setting.deleteOne({ key: 'last_supply_report_date' });
-        console.log(`Cleared last_supply_report_date because supply_report_time changed from ${oldSupplyReportTime} to ${settings.supply_report_time}`);
+        await Setting.deleteOne({ key: 'last_supply_report_slot1_date' });
+        console.log(`Cleared last_supply_report_date & slot1 because supply_report_time changed from ${oldSupplyReportTime} to ${settings.supply_report_time}`);
+    }
+
+    const oldSupplyReportTime2 = existingSettings.find(s => s.key === 'supply_report_time_2')?.value || '';
+    if (settings.supply_report_time_2 !== undefined && settings.supply_report_time_2 !== oldSupplyReportTime2) {
+        await Setting.deleteOne({ key: 'last_supply_report_slot2_date' });
+        console.log(`Cleared last_supply_report_slot2_date because supply_report_time_2 changed from ${oldSupplyReportTime2} to ${settings.supply_report_time_2}`);
+    }
+
+    const oldSupplyFrequency = existingSettings.find(s => s.key === 'supply_schedule_frequency')?.value || '1';
+    if (settings.supply_schedule_frequency !== undefined && settings.supply_schedule_frequency !== oldSupplyFrequency) {
+        await Setting.deleteOne({ key: 'last_supply_report_slot2_date' });
+        console.log(`Cleared last_supply_report_slot2_date because supply_schedule_frequency changed from ${oldSupplyFrequency} to ${settings.supply_schedule_frequency}`);
     }
 
     // If lunch_reminder_time was changed, clear last_lunch_reminder_date to allow re-triggering
@@ -289,12 +304,11 @@ exports.sendToSupply = asyncHandler(async (req, res) => {
 
     try {
         const supplyBot = new Telegraf(supplyBotToken);
-        await bot.replaceGroupMessage(
-            supplyBot,
-            supplyGroupId,
-            message,
-            null,
-            'last_supply_message_id'
+        const sent = await supplyBot.telegram.sendMessage(supplyGroupId, message);
+        await Setting.findOneAndUpdate(
+            { key: 'last_supply_message_id' },
+            { value: String(sent.message_id), updated_at: Date.now() },
+            { upsert: true }
         );
     } catch (error) {
         console.error('Failed to send supply message:', error.message);

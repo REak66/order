@@ -1,16 +1,69 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-*.log
-*.err.log
-
+# Environment Variables & Secrets
 .env
 .env.*
+.env.local
+.env.*.local
 !.env.example
+!.env.*.example
+*.pem
+*.key
 
+# Production & Build Outputs
 dist/
+dist-ssr/
 build/
-coverage/
+out/
+*.tsbuildinfo
 
-.DS_Store
-Thumbs.db
+# Caches & Temp Directories
+.cache/
+.eslintcache/
+.vite/
+.turbo/
+*.tmp
+*.temp
+
+# Logs
+logs/
+*.log
+*.err.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# Deployment & Hosting
 .vercel
+.serverless/
+
+# Editor & IDE Files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
