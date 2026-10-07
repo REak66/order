@@ -64,7 +64,7 @@ const StaffTableRow = React.memo(({ member, index, onToggleStandby, onEdit, onDe
             type="button"
             onClick={() => onToggleStandby(member)}
             className={cn(
-              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500/20",
+              "relative inline-flex h-6 w-11 min-h-0 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500/20",
               member.is_standby ? "bg-amber-500" : "bg-slate-200 dark:bg-slate-700"
             )}
             title={member.is_standby ? "Standby Enabled (Click to toggle OFF)" : "Standby Disabled (Click to toggle ON)"}
@@ -118,22 +118,6 @@ const StaffMobileCard = React.memo(({ member, index, onToggleStandby, onEdit, on
           <span className="px-2.5 py-1 bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0">
             {member.branch}
           </span>
-          <button
-            type="button"
-            onClick={() => onToggleStandby(member)}
-            className={cn(
-              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-              member.is_standby ? "bg-amber-500" : "bg-slate-200 dark:bg-slate-700"
-            )}
-            title={member.is_standby ? "Standby Enabled" : "Standby Disabled"}
-          >
-            <span
-              className={cn(
-                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                member.is_standby ? "translate-x-4" : "translate-x-0"
-              )}
-            />
-          </button>
         </div>
       </div>
 
@@ -151,17 +135,35 @@ const StaffMobileCard = React.memo(({ member, index, onToggleStandby, onEdit, on
           <span className="font-mono text-slate-600 dark:text-slate-400">{member.byd_id || <span className="text-slate-300 dark:text-slate-700">—</span>}</span>
         </div>
         <div>
-          <span className="text-slate-400 dark:text-slate-500 block text-[10px] uppercase font-bold tracking-wider">Standby Duty</span>
-          <span className="font-semibold text-slate-700 dark:text-slate-300">
-            {member.is_standby ? (
-              <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
-                <Shield size={12} className="shrink-0" />
-                <span>Standby</span>
-              </span>
-            ) : (
-              <span className="text-slate-400">Normal</span>
-            )}
-          </span>
+          <span className="text-slate-400 dark:text-slate-500 block text-[10px] uppercase font-bold tracking-wider mb-1">Standby Duty</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onToggleStandby(member)}
+              className={cn(
+                "relative inline-flex h-5 w-9 min-h-0 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                member.is_standby ? "bg-amber-500" : "bg-slate-200 dark:bg-slate-700"
+              )}
+              title={member.is_standby ? "Standby Enabled (Tap to toggle)" : "Standby Disabled (Tap to toggle)"}
+            >
+              <span
+                className={cn(
+                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                  member.is_standby ? "translate-x-4" : "translate-x-0"
+                )}
+              />
+            </button>
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              {member.is_standby ? (
+                <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
+                  <Shield size={12} className="shrink-0" />
+                  <span>Standby</span>
+                </span>
+              ) : (
+                <span className="text-slate-400">Normal</span>
+              )}
+            </span>
+          </div>
         </div>
       </div>
 

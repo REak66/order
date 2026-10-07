@@ -7,7 +7,6 @@ import {
   Utensils,
   XCircle,
   RotateCcw,
-  Sparkles,
   X,
   Layers,
   Shield,
@@ -371,19 +370,6 @@ const ManualOrder = () => {
     }
   };
 
-  const handleSelectTomorrowOnly = () => {
-    setSelectedDates([tomorrowIso]);
-  };
-
-  const handleSelectWorkdays = () => {
-    const workdays = upcomingDays
-      .filter(d => !d.isWeekend)
-      .slice(0, 5)
-      .map(d => d.dateStr);
-    setIsMultiDateMode(true);
-    setSelectedDates(workdays);
-  };
-
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
   const isCancelDisabled = useMemo(() => {
@@ -594,89 +580,62 @@ const ManualOrder = () => {
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
         {/* Header Bar */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl text-white bg-primary-600 shadow-sm shadow-primary-600/20">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl text-white bg-primary-600 shadow-sm shadow-primary-600/20 shrink-0">
               <Calendar size={18} />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Order Date Horizon</h3>
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-bold text-slate-800 dark:text-white">Order Date Horizon</h3>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
                   {selectedDates.length} selected
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Select target lunch date(s) or pick a date range for bulk staff ordering
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate sm:whitespace-normal">
+                Select target lunch date(s) or pick a date range
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-            {/* Segmented Mode Toggle */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMultiDateMode(false);
-                  if (selectedDates.length > 1) setSelectedDates([selectedDates[0]]);
-                }}
-                className={cn(
-                  "px-3 py-1 text-xs font-semibold rounded-lg transition cursor-pointer",
-                  !isMultiDateMode
-                    ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm font-bold"
-                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                )}
-              >
-                Single Date
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsMultiDateMode(true)}
-                className={cn(
-                  "px-3 py-1 text-xs font-semibold rounded-lg transition cursor-pointer",
-                  isMultiDateMode
-                    ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm font-bold"
-                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                )}
-              >
-                Multi-Date
-              </button>
-            </div>
-
+          {/* Segmented Mode Toggle */}
+          <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/50 dark:border-slate-700/50 w-full sm:w-auto">
             <button
               type="button"
-              onClick={handleSelectTomorrowOnly}
-              className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+              onClick={() => {
+                setIsMultiDateMode(false);
+                if (selectedDates.length > 1) setSelectedDates([selectedDates[0]]);
+              }}
+              className={cn(
+                "px-3 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer text-center",
+                !isMultiDateMode
+                  ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-xs font-bold"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              )}
             >
-              Tomorrow
+              Single Date
             </button>
             <button
               type="button"
-              onClick={handleSelectWorkdays}
-              className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer flex items-center gap-1.5"
+              onClick={() => setIsMultiDateMode(true)}
+              className={cn(
+                "px-3 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer text-center",
+                isMultiDateMode
+                  ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-xs font-bold"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              )}
             >
-              <Sparkles size={12} className="text-amber-500" />
-              <span>5 Workdays</span>
+              Multi-Date
             </button>
-
-            {/* Quick Date Range Launcher */}
-            <SelectDateRange
-              startDate={rangeStart}
-              endDate={rangeEnd}
-              onApply={handleDateRangeApply}
-              min={tomorrowIso}
-              align="right"
-              className="w-auto"
-            />
           </div>
         </div>
 
         {/* Date Horizon Pills (Balanced 7-Day Grid) */}
         <div className="p-4 sm:p-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 sm:gap-3">
-            {upcomingDays.map((day) => {
+            {upcomingDays.map((day, idx) => {
               const isSelected = selectedDates.includes(day.dateStr);
               const isHoliday = !!day.holiday;
+              const isLast = idx === upcomingDays.length - 1;
 
               return (
                 <button
@@ -685,6 +644,7 @@ const ManualOrder = () => {
                   onClick={() => toggleDateSelection(day.dateStr)}
                   className={cn(
                     "p-2.5 sm:p-3 rounded-xl text-left border transition-all cursor-pointer relative flex flex-col justify-between min-h-[72px] sm:min-h-[82px]",
+                    isLast && "col-span-2 sm:col-span-1",
                     isSelected
                       ? "border-primary-500 dark:border-primary-400 bg-primary-50/80 dark:bg-primary-950/70 ring-1 ring-primary-500/40 dark:ring-primary-400/40 shadow-sm shadow-primary-500/10"
                       : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs",
@@ -717,7 +677,7 @@ const ManualOrder = () => {
                   <div className="min-h-[16px]">
                     {isHoliday ? (
                       <span
-                        className="text-[10px] font-bold text-amber-600 dark:text-amber-400 truncate flex items-center justify-center gap-1 leading-tight"
+                        className="text-[10px] font-bold text-amber-600 dark:text-amber-400 truncate flex items-center gap-1 leading-tight"
                         title={day.holiday.name}
                       >
                         <Palmtree size={11} className="shrink-0" />
@@ -740,45 +700,49 @@ const ManualOrder = () => {
         </div>
 
         {/* Selected Date Summary & Custom Date Footer */}
-        <div className="px-4 sm:px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-semibold text-slate-500 dark:text-slate-400 mr-1">
+        <div className="px-4 sm:px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <span className="font-semibold text-slate-500 dark:text-slate-400 mr-1 shrink-0">
               Target ({selectedDates.length}):
             </span>
-            {selectedDates.map(d => {
-              const hol = holidaysMap[d];
-              return (
-                <span
-                  key={d}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono font-bold text-xs transition group",
-                    hol
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
-                      : "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300 border border-primary-200 dark:border-primary-800"
-                  )}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {hol ? <Palmtree size={12} className="shrink-0 text-amber-700 dark:text-amber-300" /> : <Calendar size={12} className="shrink-0 text-primary-600 dark:text-primary-400" />}
-                    <span>{d} {hol ? `(${hol.name.split('(')[0].trim()})` : ''}</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {selectedDates.map(d => {
+                const hol = holidaysMap[d];
+                return (
+                  <span
+                    key={d}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono font-bold text-xs transition group",
+                      hol
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                        : "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300 border border-primary-200 dark:border-primary-800"
+                    )}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {hol ? <Palmtree size={12} className="shrink-0 text-amber-700 dark:text-amber-300" /> : <Calendar size={12} className="shrink-0 text-primary-600 dark:text-primary-400" />}
+                      <span>{d} {hol ? `(${hol.name.split('(')[0].trim()})` : ''}</span>
+                    </span>
+                    {selectedDates.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDate(d)}
+                        className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 rounded transition cursor-pointer p-0.5"
+                        title="Deselect this date"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
                   </span>
-                  {selectedDates.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveDate(d)}
-                      className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 rounded transition cursor-pointer p-0.5"
-                      title="Deselect this date"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </span>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-end sm:self-auto flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">Single:</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-400 dark:text-slate-500 text-[11px] uppercase tracking-wider shrink-0 w-12 sm:w-auto">
+                Single:
+              </span>
               <SelectDate
                 value={selectedDates[0] || tomorrowIso}
                 onChange={(e) => {
@@ -787,18 +751,20 @@ const ManualOrder = () => {
                   }
                 }}
                 align="right"
-                className="w-36 sm:w-40"
+                className="w-full sm:w-36"
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">Range:</span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-400 dark:text-slate-500 text-[11px] uppercase tracking-wider shrink-0 w-12 sm:w-auto">
+                Range:
+              </span>
               <SelectDateRange
                 startDate={rangeStart}
                 endDate={rangeEnd}
                 onApply={handleDateRangeApply}
                 min={tomorrowIso}
                 align="right"
-                className="w-44 sm:w-52"
+                className="w-full sm:w-44"
               />
             </div>
           </div>

@@ -55,14 +55,7 @@ select {
   touch-action: manipulation;
 }
 
-/* Ensure minimum touch target size on mobile (WCAG 2.5.5) */
-@media (max-width: 640px) {
-  button,
-  a,
-  [role="button"] {
-    min-height: 44px;
-  }
-}
+
 
 /* Safe area padding for iOS notch/home indicator */
 .pb-safe {

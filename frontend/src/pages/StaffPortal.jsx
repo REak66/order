@@ -19,7 +19,6 @@ import {
   Check,
   X,
   Lock,
-  Sparkles,
   Shield,
   CheckSquare,
   Square,
@@ -149,25 +148,6 @@ const StaffPortal = () => {
     }
   };
 
-  const handleSelectTomorrow = () => {
-    if (orderData?.order_date) {
-      setSelectedDates([orderData.order_date]);
-    }
-  };
-
-  const handleSelectWorkdays = () => {
-    if (!horizonDays.length) return;
-    const workdays = horizonDays
-      .filter(d => !d.isWeekend && (!d.holiday || user?.is_standby))
-      .slice(0, 5)
-      .map(d => d.date);
-
-    if (workdays.length > 0) {
-      setIsMultiDateMode(true);
-      setSelectedDates(workdays);
-      toast.success(`Selected ${workdays.length} upcoming working days`);
-    }
-  };
 
   // Selected days analysis
   const selectedHorizonDays = useMemo(() => {
@@ -520,35 +500,6 @@ const StaffPortal = () => {
                   </button>
                 </div>
 
-                {/* Quick Preset Buttons (only visible in Multi-Date mode) */}
-                {isMultiDateMode && (
-                  <div className="flex items-center gap-1.5 py-0.5">
-                    <button
-                      type="button"
-                      onClick={handleSelectTomorrow}
-                      className="flex-1 xs:flex-none px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer whitespace-nowrap text-center"
-                    >
-                      Tomorrow
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSelectWorkdays}
-                      className="flex-1 xs:flex-none px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
-                    >
-                      <Sparkles size={12} className="text-amber-500" />
-                      <span>5 Workdays</span>
-                    </button>
-                    {selectedDates.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDates([])}
-                        className="flex-1 xs:flex-none px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer whitespace-nowrap text-center"
-                      >
-                        Deselect
-                      </button>
-                    )}
-                  </div>
-                )}
 
                 {/* Single Date Target Info Indicator */}
                 {!isMultiDateMode && tomorrowDay && (

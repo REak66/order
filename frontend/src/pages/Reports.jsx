@@ -10,7 +10,10 @@ import {
   Megaphone,
   Lightbulb,
   Palmtree,
-  Star
+  Star,
+  Filter,
+  RotateCcw,
+  X
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { addDays, endOfWeek, format, startOfWeek, parseISO } from 'date-fns';
@@ -304,133 +307,237 @@ const Reports = () => {
     });
   };
 
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filters.branch) count++;
+    if (filters.status) count++;
+    if (searchTerm.trim()) count++;
+    if (filters.period !== 'daily') count++;
+    return count;
+  }, [filters.branch, filters.status, filters.period, searchTerm]);
+
+  const handleResetFilters = () => {
+    setFilters({
+      period: 'daily',
+      date: tomorrowIso,
+      month: tomorrowMonth,
+      startDate: tomorrowIso,
+      endDate: tomorrowIso,
+      branch: '',
+      status: ''
+    });
+    setSearchTerm('');
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Lunch Reports</h2>
-          <p className="text-xs text-slate-500 sm:text-sm">View and export lunch order reports by day, week, month, or date range</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white tracking-tight">Lunch Reports</h2>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            View and export lunch order reports by day, week, month, or date range
+          </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto shrink-0">
           <button
             onClick={() => handleExport('excel')}
-            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl transition cursor-pointer font-semibold text-xs sm:text-sm shadow-md shadow-green-600/10 hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition cursor-pointer font-semibold text-xs sm:text-sm shadow-sm shadow-emerald-600/20 active:scale-95"
           >
-            <Download size={16} />
+            <Download size={15} />
             <span>Excel</span>
           </button>
           <button
             onClick={() => handleExport('pdf')}
-            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl transition cursor-pointer font-semibold text-xs sm:text-sm shadow-md shadow-red-600/10 hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition cursor-pointer font-semibold text-xs sm:text-sm shadow-sm shadow-rose-600/20 active:scale-95"
           >
-            <Download size={16} />
+            <Download size={15} />
             <span>PDF</span>
           </button>
         </div>
       </div>
 
-      <div className="grid items-end grid-cols-2 gap-2.5 p-3 bg-white border shadow-sm dark:bg-slate-900 sm:p-4 rounded-2xl border-slate-100 dark:border-slate-800 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 sm:gap-4">
-        <div className="w-full space-y-1">
-          <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
-            <CalendarRange size={12} />
-            Range
-          </label>
-          <SearchSelect
-            options={periodOptions}
-            value={filters.period}
-            onChange={(e) => updatePeriod(e.target.value)}
-            placeholder="Select Range"
-            hasSearch={false}
-            className="w-full"
-          />
-        </div>
-        <div className="w-full space-y-1">
-          <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
-            <Calendar size={12} />
-            {(isMonthlyReport || isCustomSummaryReport) ? 'Month' : filters.period === 'daily' ? 'Order Date' : 'Base Date'}
-          </label>
-          {(isMonthlyReport || isCustomSummaryReport) ? (
-            <SelectMonth
-              value={filters.month}
-              onChange={(e) => updateMonth(e.target.value)}
-              className="w-full"
-            />
-          ) : (
-            <SelectDate
-              value={filters.date}
-              onChange={(e) => updateDate(e.target.value)}
-              className="w-full"
-            />
+      {/* Filter Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs p-3.5 sm:p-4.5 space-y-3 sm:space-y-3.5">
+        {/* Filter Toolbar Header */}
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400">
+              <Filter size={14} />
+            </div>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              Filter Options
+            </span>
+            {activeFiltersCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
+                {activeFiltersCount} active
+              </span>
+            )}
+          </div>
+
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="text-xs font-semibold text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <RotateCcw size={12} />
+              <span>Reset</span>
+            </button>
           )}
         </div>
-        {filters.period === 'custom' && (
-          <>
-            <div className="w-full space-y-1">
-              <label className="text-xs font-semibold uppercase text-slate-500">Start Date</label>
-              <SelectDate
-                value={filters.startDate}
-                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                className="w-full"
-              />
-            </div>
-            <div className="w-full space-y-1">
-              <label className="text-xs font-semibold uppercase text-slate-500">End Date</label>
-              <SelectDate
-                value={filters.endDate}
-                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                className="w-full"
-              />
-            </div>
-          </>
-        )}
-        <div className="w-full space-y-1">
-          <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
-            <Building size={12} />
-            Branch
-          </label>
-          <SearchSelect
-            options={branchOptions}
-            value={filters.branch}
-            onChange={(e) => setFilters({ ...filters, branch: e.target.value })}
-            placeholder="All Branches"
-            hasSearch={true}
-            className="w-full"
-          />
-        </div>
-        {isDetailedReport && (
-          <div className="w-full space-y-1">
-            <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
-              <Utensils size={12} />
-              Status
+
+        {/* Filter Inputs Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-12 gap-2.5 sm:gap-3 lg:gap-3.5 items-end">
+          {/* Range Selector */}
+          <div className="w-full space-y-1.5 col-span-1 md:col-span-1 lg:col-span-3 xl:col-span-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+              <CalendarRange size={13} className="text-primary-500 shrink-0" />
+              <span>Range</span>
             </label>
             <SearchSelect
-              options={statusOptions}
-              value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              placeholder="All Statuses"
+              options={periodOptions}
+              value={filters.period}
+              onChange={(e) => updatePeriod(e.target.value)}
+              placeholder="Select Range"
               hasSearch={false}
               className="w-full"
             />
           </div>
-        )}
-        {!isSummaryReport && (
-          <div className="w-full space-y-1 col-span-2 sm:col-span-2 md:col-span-1 xl:col-span-1">
-            <label className="flex items-center gap-1 text-xs font-semibold uppercase text-slate-500">
-              <Search size={12} />
-              Search Staff
+
+          {/* Date / Month Selector */}
+          {filters.period !== 'custom' ? (
+            <div className="w-full space-y-1.5 col-span-1 md:col-span-1 lg:col-span-3 xl:col-span-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5 truncate">
+                <Calendar size={13} className="text-primary-500 shrink-0" />
+                <span className="truncate">
+                  {(isMonthlyReport || isCustomSummaryReport)
+                    ? 'Month'
+                    : filters.period === 'daily'
+                      ? 'Order Date'
+                      : 'Base Date'}
+                </span>
+              </label>
+              {(isMonthlyReport || isCustomSummaryReport) ? (
+                <SelectMonth
+                  value={filters.month}
+                  onChange={(e) => updateMonth(e.target.value)}
+                  className="w-full"
+                />
+              ) : (
+                <SelectDate
+                  value={filters.date}
+                  onChange={(e) => updateDate(e.target.value)}
+                  className="w-full"
+                />
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Custom Start Date */}
+              <div className="w-full space-y-1.5 col-span-1 md:col-span-1 lg:col-span-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                  <Calendar size={13} className="text-primary-500 shrink-0" />
+                  <span>Start Date</span>
+                </label>
+                <SelectDate
+                  value={filters.startDate}
+                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Custom End Date */}
+              <div className="w-full space-y-1.5 col-span-1 md:col-span-1 lg:col-span-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                  <Calendar size={13} className="text-primary-500 shrink-0" />
+                  <span>End Date</span>
+                </label>
+                <SelectDate
+                  value={filters.endDate}
+                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                  className="w-full"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Branch Selector */}
+          <div className={cn(
+            "w-full space-y-1.5 col-span-1 md:col-span-1",
+            filters.period === 'custom' ? "lg:col-span-2" : "lg:col-span-3 xl:col-span-2",
+            !isDetailedReport && "col-span-2 md:col-span-1"
+          )}>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+              <Building size={13} className="text-primary-500 shrink-0" />
+              <span>Branch</span>
             </label>
-            <div className="relative">
-              <Search className="absolute -translate-y-1/2 left-3 top-1/2 text-slate-400" size={18} />
-              <input
-                type="text"
-                className="w-full py-2 pl-10 pr-4 transition border border-slate-200 dark:border-slate-700/60 outline-none bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-primary-500 text-sm"
-                placeholder="Search staff, branch, or status..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+            <SearchSelect
+              options={branchOptions}
+              value={filters.branch}
+              onChange={(e) => setFilters({ ...filters, branch: e.target.value })}
+              placeholder="All Branches"
+              hasSearch={true}
+              className="w-full"
+            />
+          </div>
+
+          {/* Status Selector (detailed report only) */}
+          {isDetailedReport && (
+            <div className={cn(
+              "w-full space-y-1.5 col-span-1 md:col-span-1",
+              filters.period === 'custom' ? "lg:col-span-2" : "lg:col-span-3 xl:col-span-2"
+            )}>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                <Utensils size={13} className="text-primary-500 shrink-0" />
+                <span>Status</span>
+              </label>
+              <SearchSelect
+                options={statusOptions}
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                placeholder="All Statuses"
+                hasSearch={false}
+                className="w-full"
               />
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Search Staff */}
+          {!isSummaryReport && (
+            <div className={cn(
+              "w-full space-y-1.5 col-span-2 md:col-span-4",
+              filters.period === 'custom'
+                ? "lg:col-span-12 xl:col-span-4"
+                : "lg:col-span-12 xl:col-span-4"
+            )}>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                <Search size={13} className="text-primary-500 shrink-0" />
+                <span>Search Staff</span>
+              </label>
+              <div className="relative">
+                <Search className="absolute -translate-y-1/2 left-3 top-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" size={16} />
+                <input
+                  type="text"
+                  className="w-full py-2.5 pl-9 pr-8 transition border border-slate-200 dark:border-slate-700/80 outline-none bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-xs sm:text-sm shadow-xs font-medium placeholder:text-slate-400 placeholder:font-normal"
+                  placeholder="Search staff, branch, or status..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="overflow-hidden bg-white border shadow-sm dark:bg-slate-900 rounded-2xl border-slate-100 dark:border-slate-800">

@@ -13,6 +13,8 @@ const SearchSelect = ({
   hasSearch = true,
   className = '',
   disabled = false,
+  toggleClasses = '',
+  dropdownScope = 'parent',
 }) => {
   const selectRef = useRef(null);
   const onChangeRef = useRef(onChange);
@@ -53,15 +55,42 @@ const SearchSelect = ({
 
     return () => {
       selectEl.removeEventListener('change', handleNativeChange);
-      // Clean up the custom FlyonUI elements and restore the original select element
+      // Clean up the custom FlyonUI elements, floating menus, and restore original select
       if (window.HSSelect) {
         const instance = window.HSSelect.getInstance(selectEl);
         if (instance) {
-          instance.destroy();
+          try {
+            if (typeof instance.close === 'function') {
+              instance.close(true);
+            }
+          } catch (e) {}
+
+          try {
+            if (instance.floatingUIInstance && typeof instance.floatingUIInstance.destroy === 'function') {
+              instance.floatingUIInstance.destroy();
+            }
+          } catch (e) {}
+
+          try {
+            if (instance.dropdown && instance.dropdown.parentNode) {
+              instance.dropdown.remove();
+            }
+          } catch (e) {}
+
+          try {
+            instance.destroy();
+          } catch (e) {}
         }
       }
+
+      // Safeguard: Remove any stray dropdown appended to body for this element
+      const wrapper = selectEl.closest('.advance-select');
+      if (wrapper) {
+        const strayDropdown = wrapper.querySelector('[data-select-dropdown]');
+        if (strayDropdown) strayDropdown.remove();
+      }
     };
-  }, [options, hasSearch, searchLimit, placeholder]);
+  }, [options, hasSearch, searchLimit, placeholder, dropdownScope]);
 
   // Sync external React state value changes to FlyonUI's dropdown UI
   useEffect(() => {
@@ -91,9 +120,9 @@ const SearchSelect = ({
     hasSearch: hasSearch,
     searchLimit: searchLimit,
     placeholder: placeholder,
-    dropdownScope: 'window', // Portal style positioning using fixed layout to escape overflow clipping in tables
+    dropdownScope: dropdownScope,
     toggleTag: '<button type="button" aria-expanded="false"></button>',
-    toggleClasses: 'advance-select-toggle select-disabled:pointer-events-none select-disabled:opacity-40 w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition text-sm text-slate-700 dark:text-slate-200 text-left pr-8 relative font-medium shadow-sm hover:bg-slate-100/50 dark:hover:bg-slate-800/60',
+    toggleClasses: toggleClasses || 'advance-select-toggle select-disabled:pointer-events-none select-disabled:opacity-40 w-full h-10 sm:h-10.5 flex items-center px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition text-xs sm:text-sm text-slate-700 dark:text-slate-200 text-left pr-8 relative font-medium shadow-xs hover:bg-slate-100/50 dark:hover:bg-slate-800/60',
     dropdownClasses: 'advance-select-menu max-h-52 pt-0 overflow-y-auto w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-xl z-[9999] p-1.5',
     optionClasses: 'advance-select-option selected:select-active text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 rounded-lg transition-colors px-3 py-2 flex items-center justify-between selected:bg-primary-50 dark:selected:bg-primary-950/30 selected:text-primary-600 dark:selected:text-primary-400',
     optionTemplate: '<div class="flex justify-between items-center w-full"><span data-title></span><svg class="shrink-0 size-4 text-primary hidden selected:block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg></div>',

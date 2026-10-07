@@ -164,7 +164,7 @@ const DashboardLayout = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 pb-24 lg:pb-6 pb-safe">
+        <main className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 pb-32 lg:pb-8">
           <Outlet />
         </main>
 

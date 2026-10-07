@@ -102,15 +102,15 @@ const SelectMonth = ({
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl outline-none transition text-sm text-slate-700 dark:text-slate-200 text-left relative font-medium shadow-sm hover:bg-slate-100/50 dark:hover:bg-slate-800/60 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
+          "w-full h-10 sm:h-10.5 flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl outline-none transition text-xs sm:text-sm text-slate-700 dark:text-slate-200 text-left relative font-medium shadow-xs hover:bg-slate-100/50 dark:hover:bg-slate-800/60 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
           isOpen && "ring-2 ring-primary-500/20 border-primary-500 dark:border-primary-400 bg-white dark:bg-slate-800"
         )}
       >
-        <span className="flex items-center gap-2">
-          <CalendarIcon size={16} className={cn("text-slate-400 dark:text-slate-500 transition-colors", isOpen && "text-primary-500 dark:text-primary-400")} />
-          <span>{displayValue()}</span>
+        <span className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
+          <CalendarIcon size={15} className={cn("text-slate-400 dark:text-slate-500 transition-colors shrink-0", isOpen && "text-primary-500 dark:text-primary-400")} />
+          <span className="truncate whitespace-nowrap">{displayValue()}</span>
         </span>
-        <ChevronDown size={16} className="text-slate-400 dark:text-slate-500 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }} />
+        <ChevronDown size={15} className="text-slate-400 dark:text-slate-500 transition-transform duration-200 shrink-0" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }} />
       </button>
 
       <AnimatePresence>

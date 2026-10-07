@@ -39,6 +39,11 @@ function AppRoutes() {
   const { isAuthenticated, isAdmin, loading } = useAuth();
 
   useEffect(() => {
+    // Purge any lingering or orphaned FlyonUI dropdown menus attached to document.body on route transition
+    document.querySelectorAll('body > .advance-select-menu, body > [data-select-dropdown]').forEach(el => {
+      el.remove();
+    });
+
     const titles = {
       '/': 'Staff Lunch Order System',
       '/login': 'Staff Sign In - Lunch Order',

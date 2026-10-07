@@ -38,9 +38,12 @@ const SelectDate = ({
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUpwards = spaceBelow < popupHeight && rect.top > popupHeight;
 
-    const top = openUpwards
+    let top = openUpwards
       ? Math.max(8, rect.top - popupHeight - 8)
       : Math.min(window.innerHeight - popupHeight - 8, rect.bottom + 8);
+
+    // Safeguard bounds so it never overflows screen edges
+    top = Math.max(8, Math.min(Math.max(8, window.innerHeight - popupHeight - 8), top));
 
     let left = align === 'right'
       ? rect.right - popupWidth
@@ -73,8 +76,14 @@ const SelectDate = ({
     };
   }, [isOpen, updatePosition]);
 
-  // Close calendar when clicking outside (checks both container button & portal dropdown)
+  // Close calendar when clicking outside or pressing Escape
   useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+
     const handleClickOutside = (event) => {
       const isInsideContainer = containerRef.current && containerRef.current.contains(event.target);
       const isInsideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
@@ -84,11 +93,16 @@ const SelectDate = ({
       }
     };
 
+    window.addEventListener('keydown', handleKeyDown);
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, []);
+  }, [isOpen]);
 
   // Listen to Cally's custom 'change' event via ref to support React 18 & 19 seamlessly
   useEffect(() => {
@@ -125,32 +139,39 @@ const SelectDate = ({
   };
 
   return (
-    <div className={cn("relative inline-block", className)} ref={containerRef}>
+    <div className={cn("relative", className || "inline-block")} ref={containerRef}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl outline-none transition text-sm text-slate-700 dark:text-slate-200 text-left relative font-medium shadow-sm hover:bg-slate-100/50 dark:hover:bg-slate-800/60 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
+          "w-full h-10 sm:h-10.5 flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl outline-none transition text-xs sm:text-sm text-slate-700 dark:text-slate-200 text-left relative font-medium shadow-xs hover:bg-slate-100/50 dark:hover:bg-slate-800/60 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
           isOpen && "ring-2 ring-primary-500/20 border-primary-500 dark:border-primary-400 bg-white dark:bg-slate-800"
         )}
       >
-        <span className="flex items-center gap-2">
-          <CalendarIcon size={16} className={cn("text-slate-400 dark:text-slate-500 transition-colors", isOpen && "text-primary-500 dark:text-primary-400")} />
-          <span>{displayValue()}</span>
+        <span className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
+          <CalendarIcon size={15} className={cn("text-slate-400 dark:text-slate-500 transition-colors shrink-0", isOpen && "text-primary-500 dark:text-primary-400")} />
+          <span className="truncate whitespace-nowrap">{displayValue()}</span>
         </span>
-        <ChevronDown size={16} className="text-slate-400 dark:text-slate-500 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }} />
+        <ChevronDown size={15} className="text-slate-400 dark:text-slate-500 transition-transform duration-200 shrink-0" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }} />
       </button>
 
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {isOpen && (
-            <motion.div
-              ref={dropdownRef}
-              initial={{ opacity: 0, y: 8, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.96 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
+            <>
+              {/* Click-catcher backdrop */}
+              <div
+                className="fixed inset-0 z-[99998] bg-black/20 sm:bg-transparent"
+                onClick={() => setIsOpen(false)}
+                aria-hidden="true"
+              />
+              <motion.div
+                ref={dropdownRef}
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
               style={{
                 position: 'fixed',
                 top: `${coords.top}px`,
@@ -174,6 +195,7 @@ const SelectDate = ({
                 <calendar-month />
               </calendar-date>
             </motion.div>
+            </>
           )}
         </AnimatePresence>,
         document.body

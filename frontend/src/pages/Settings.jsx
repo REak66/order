@@ -320,7 +320,7 @@ const Settings = () => {
   </div>;
 
   return (
-    <div className="max-w-4xl space-y-6 sm:space-y-8">
+    <div className="max-w-4xl space-y-6 sm:space-y-8 pb-8 sm:pb-4">
       <div>
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">System Settings</h2>
         <p className="text-slate-500 text-xs sm:text-sm">Configure Telegram bot and system-wide parameters</p>
@@ -353,8 +353,10 @@ const Settings = () => {
             <div
               className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
             >
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                <MessageSquare className="text-primary-500" size={20} />
+              <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+                <div className="p-2 bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 rounded-xl">
+                  <MessageSquare size={18} />
+                </div>
                 <h3 className="font-bold text-slate-800 dark:text-white">Telegram Configuration</h3>
               </div>
               <div className="p-4 sm:p-6 space-y-6">
@@ -387,8 +389,10 @@ const Settings = () => {
             <div
               className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
             >
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                <Clock className="text-primary-500" size={20} />
+              <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+                <div className="p-2 bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 rounded-xl">
+                  <Clock size={18} />
+                </div>
                 <h3 className="font-bold text-slate-800 dark:text-white">Schedule Settings</h3>
               </div>
               <div className="p-4 sm:p-6 space-y-6">
@@ -420,9 +424,11 @@ const Settings = () => {
 
             {/* Advance Order Horizon & Weekend Ordering */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="text-primary-500" size={20} />
+              <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 rounded-xl">
+                    <Calendar size={18} />
+                  </div>
                   <div>
                     <h3 className="font-bold text-slate-800 dark:text-white">Order Horizon & Working Days</h3>
                     <p className="text-xs text-slate-400">Control multi-date advance ordering window and weekend eligibility</p>
@@ -431,38 +437,38 @@ const Settings = () => {
               </div>
               <div className="p-4 sm:p-6 space-y-6">
                 {/* Mode Selector */}
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h4 className="text-sm font-bold text-slate-800 dark:text-white">Order Date Horizon Mode</h4>
                       <p className="text-xs text-slate-400 mt-0.5">Choose how the available ordering window is calculated for staff</p>
                     </div>
-                    <div className="inline-flex p-1 bg-slate-200/80 dark:bg-slate-900 rounded-xl border border-slate-300/40 dark:border-slate-800 self-start sm:self-auto">
+                    <div className="grid grid-cols-2 sm:flex sm:w-auto w-full p-1 bg-slate-200/80 dark:bg-slate-900 rounded-xl border border-slate-300/40 dark:border-slate-800 gap-1 shrink-0">
                       <button
                         type="button"
                         onClick={() => setSettings({ ...settings, order_horizon_mode: 'rolling' })}
                         className={cn(
-                          "inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                          "flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[36px] sm:min-h-0 text-center",
                           (settings.order_horizon_mode || 'rolling') === 'rolling'
                             ? "bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 shadow-xs font-bold"
                             : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                         )}
                       >
                         <RefreshCw size={13} className="shrink-0" />
-                        <span>Rolling Advance Days</span>
+                        <span>Rolling <span className="hidden sm:inline">Advance </span>Days</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setSettings({ ...settings, order_horizon_mode: 'date_range' })}
                         className={cn(
-                          "inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                          "flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[36px] sm:min-h-0 text-center",
                           settings.order_horizon_mode === 'date_range'
                             ? "bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 shadow-xs font-bold"
                             : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                         )}
                       >
                         <CalendarRange size={13} className="shrink-0" />
-                        <span>Fixed Date Range</span>
+                        <span>Fixed <span className="hidden sm:inline">Date </span>Range</span>
                       </button>
                     </div>
                   </div>
@@ -479,7 +485,7 @@ const Settings = () => {
                         type="number"
                         min="1"
                         max="30"
-                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
+                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
                         placeholder="e.g. 7"
                         value={settings.max_advance_days || '7'}
                         onChange={(e) => setSettings({ ...settings, max_advance_days: e.target.value })}
@@ -492,7 +498,7 @@ const Settings = () => {
                       <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                         Weekend Orders (Sat / Sun)
                       </label>
-                      <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                      <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-xl">
                         <div>
                           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                             {settings.allow_weekend_orders === 'true' ? 'Enabled' : 'Disabled (Blocked)'}
@@ -503,7 +509,7 @@ const Settings = () => {
                               : 'Orders on weekends are rejected as non-working days'}
                           </p>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <label className="relative inline-flex items-center cursor-pointer select-none shrink-0 ml-3">
                           <input
                             type="checkbox"
                             className="sr-only peer"
@@ -521,50 +527,59 @@ const Settings = () => {
                 ) : (
                   /* Mode 2: Fixed Date Range Window */
                   <div className="space-y-4">
-                    <div className="p-3.5 rounded-xl bg-primary-50/60 dark:bg-primary-950/30 border border-primary-100 dark:border-primary-900/40 text-xs text-primary-700 dark:text-primary-300 flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <Calendar size={16} className="text-primary-600 dark:text-primary-400 shrink-0" />
-                        <span>Staff in the Staff Portal will only be able to view and order dates inside this specific range.</span>
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-primary-50/70 dark:bg-primary-950/40 border border-primary-100 dark:border-primary-900/50 text-xs text-primary-800 dark:text-primary-200 space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="p-1.5 bg-primary-100 dark:bg-primary-900/60 rounded-lg text-primary-600 dark:text-primary-400 shrink-0 mt-0.5">
+                          <Calendar size={15} />
+                        </div>
+                        <p className="leading-relaxed text-slate-600 dark:text-slate-300 text-xs">
+                          Staff in the Staff Portal will only be able to view and order dates inside this specific range.
+                        </p>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-semibold text-slate-500 dark:text-slate-400 mr-1">Presets:</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
-                            const end = format(addDays(new Date(), 5), 'yyyy-MM-dd');
-                            setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
-                          }}
-                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 cursor-pointer"
-                        >
-                          Next 5 Days
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
-                            const end = format(addDays(new Date(), 14), 'yyyy-MM-dd');
-                            setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
-                          }}
-                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 cursor-pointer"
-                        >
-                          Next 2 Weeks
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
-                            const end = format(endOfMonth(new Date()), 'yyyy-MM-dd');
-                            setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
-                          }}
-                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 cursor-pointer"
-                        >
-                          This Month
-                        </button>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2.5 border-t border-primary-100 dark:border-primary-900/40">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 shrink-0">
+                          Quick Presets:
+                        </span>
+                        <div className="grid grid-cols-3 sm:flex items-center gap-1.5 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+                              const end = format(addDays(new Date(), 5), 'yyyy-MM-dd');
+                              setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
+                            }}
+                            className="px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-950/50 dark:hover:text-primary-400 shadow-2xs transition-all cursor-pointer text-center min-h-[34px] sm:min-h-0 flex items-center justify-center truncate"
+                          >
+                            5 Days
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+                              const end = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+                              setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
+                            }}
+                            className="px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-950/50 dark:hover:text-primary-400 shadow-2xs transition-all cursor-pointer text-center min-h-[34px] sm:min-h-0 flex items-center justify-center truncate"
+                          >
+                            2 Weeks
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const start = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+                              const end = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+                              setSettings({ ...settings, order_range_start_date: start, order_range_end_date: end });
+                            }}
+                            className="px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-950/50 dark:hover:text-primary-400 shadow-2xs transition-all cursor-pointer text-center min-h-[34px] sm:min-h-0 flex items-center justify-center truncate"
+                          >
+                            This Month
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                       <div className="space-y-2">
                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                           Order Window Start Date *
@@ -587,17 +602,17 @@ const Settings = () => {
                           className="w-full"
                         />
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                           Weekend Orders (Sat / Sun)
                         </label>
-                        <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl min-h-[46px]">
                           <div>
                             <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                              {settings.allow_weekend_orders === 'true' ? 'Enabled' : 'Disabled'}
+                              {settings.allow_weekend_orders === 'true' ? 'Enabled' : 'Disabled (Blocked)'}
                             </span>
                           </div>
-                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                          <label className="relative inline-flex items-center cursor-pointer select-none shrink-0 ml-2">
                             <input
                               type="checkbox"
                               className="sr-only peer"
