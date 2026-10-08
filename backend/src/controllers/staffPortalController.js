@@ -4,7 +4,7 @@ const Setting = require('../models/Setting');
 const asyncHandler = require('../utils/asyncHandler');
 const bot = require('../services/botService');
 const bcrypt = require('bcryptjs');
-const { getLunchDate, getCambodiaTimeComponents, addDaysToIso } = require('../utils/dateUtils');
+const { getLunchDate, getCambodiaTimeComponents, addDaysToIso, toLocalIsoDate } = require('../utils/dateUtils');
 const { checkDateEligibility } = require('../utils/eligibilityEngine');
 
 // Helper: get setting value by key
@@ -77,11 +77,11 @@ const getDayName = (isoDate) => {
     return d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
 };
 
-// Helper: is the ISO date a weekend?
+// Helper: is the ISO date a weekend? (Only Sunday is weekend; Saturday is a normal working day)
 const isWeekendDate = (isoDate) => {
     const [year, month, day] = isoDate.split('-').map(Number);
     const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-    return dow === 0 || dow === 6;
+    return dow === 0;
 };
 
 
@@ -99,11 +99,13 @@ exports.getMyOrder = asyncHandler(async (req, res) => {
 
     const khParts = getCambodiaTimeComponents();
     const todayIso = `${khParts.year}-${String(khParts.month).padStart(2, '0')}-${String(khParts.day).padStart(2, '0')}`;
+    const tomorrowIso = addDaysToIso(todayIso, 1);
 
     const horizonDays = [];
 
     if (horizonMode === 'date_range' && rangeStart && rangeEnd) {
-        let curr = rangeStart < todayIso ? todayIso : rangeStart;
+        // Earliest orderable date is strictly tomorrow (orders for today or yesterday cannot be placed)
+        let curr = rangeStart < tomorrowIso ? tomorrowIso : rangeStart;
         let loopCount = 0;
         while (curr <= rangeEnd && loopCount < 60) {
             const weekend = isWeekendDate(curr);
@@ -118,7 +120,8 @@ exports.getMyOrder = asyncHandler(async (req, res) => {
                 isWeekend: weekend,
                 holiday: dayEligibility.holiday || null,
                 eligibility: dayEligibility,
-                status: existingOrder?.status || 'not_ordered'
+                status: existingOrder?.status || 'not_ordered',
+                telegram_notified: Boolean(existingOrder?.telegram_notified)
             });
 
             curr = addDaysToIso(curr, 1);
@@ -142,17 +145,20 @@ exports.getMyOrder = asyncHandler(async (req, res) => {
                 isWeekend: weekend,
                 holiday: dayEligibility.holiday || null,
                 eligibility: dayEligibility,
-                status: existingOrder?.status || 'not_ordered'
+                status: existingOrder?.status || 'not_ordered',
+                telegram_notified: Boolean(existingOrder?.telegram_notified)
             });
         }
     }
 
-    const effectiveLunchDate = horizonDays.length > 0 ? horizonDays[0].date : lunchDate;
-    const eligibility = await checkDateEligibility({ targetDate: effectiveLunchDate, user });
-    const order = await Order.findOne({ user: userId, order_date: effectiveLunchDate });
+    // In single date mode, the primary target date is strictly tomorrow's lunch date
+    const singleOrderDate = lunchDate;
+    const eligibility = await checkDateEligibility({ targetDate: singleOrderDate, user });
+    const order = await Order.findOne({ user: userId, order_date: singleOrderDate });
 
     res.json({
-        order_date: effectiveLunchDate,
+        order_date: singleOrderDate,
+        tomorrow_date: singleOrderDate,
         status: order?.status || 'not_ordered',
         order_id: order?._id || null,
         window: windowInfo,
@@ -179,11 +185,13 @@ exports.placeOrder = asyncHandler(async (req, res) => {
     }
 
     const staffUser = await User.findById(userId);
+    const today = toLocalIsoDate();
 
-    // Accept order_dates array (multi-date) or fall back to single lunchDate
-    const requestedDates = Array.isArray(req.body.order_dates) && req.body.order_dates.length > 0
+    // Accept order_dates array (multi-date) or fall back to single lunchDate (deduplicated)
+    const rawDates = Array.isArray(req.body.order_dates) && req.body.order_dates.length > 0
         ? req.body.order_dates
         : [lunchDate];
+    const requestedDates = [...new Set(rawDates)];
 
     const results = [];
     const errors = [];
@@ -195,15 +203,32 @@ exports.placeOrder = asyncHandler(async (req, res) => {
             continue;
         }
 
+        const existingOrder = await Order.findOne({ user: userId, order_date: dateStr });
+        const isAlreadyOrdered = existingOrder?.status === 'ordered';
+        const wasNotified = existingOrder?.telegram_notified === true;
+
+        // Send date is 1 day before the meal date
+        const sendDate = addDaysToIso(dateStr, -1);
+        const isImmediate = sendDate <= today;
+
         const ord = await Order.findOneAndUpdate(
             { user: userId, order_date: dateStr },
-            { status: 'ordered', created_at: new Date() },
-            { upsert: true, returnDocument: 'after' }
+            { 
+                status: 'ordered', 
+                created_at: existingOrder?.created_at || new Date(),
+                telegram_notified: isImmediate ? true : (existingOrder?.telegram_notified || false),
+                telegram_notified_at: isImmediate 
+                    ? (wasNotified ? existingOrder.telegram_notified_at : new Date())
+                    : (existingOrder?.telegram_notified_at || null)
+            },
+            { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
         );
         results.push(ord);
 
-        // Send Telegram notification (non-blocking)
-        if (staffUser) {
+        // Immediate send only for today's active cycle (e.g. tomorrow's lunch).
+        // Advance dates (Oct 12, Oct 13, etc.) will be dispatched on their send date at Order Start Time.
+        // Prevents duplicate notifications if order is already confirmed or double-clicked
+        if (staffUser && isImmediate && (!isAlreadyOrdered || !wasNotified)) {
             bot.sendOrderNotification(staffUser, ord).catch(err =>
                 console.error('Portal order notification error:', err.message)
             );
@@ -237,29 +262,43 @@ exports.cancelOrder = asyncHandler(async (req, res) => {
         });
     }
 
-    const requestedDates = Array.isArray(req.body.order_dates) && req.body.order_dates.length > 0
+    const rawCancelDates = Array.isArray(req.body.order_dates) && req.body.order_dates.length > 0
         ? req.body.order_dates
         : [lunchDate];
+    const requestedDates = [...new Set(rawCancelDates)];
 
+    const today = toLocalIsoDate();
+    const invalidDates = requestedDates.filter(d => d <= today);
+    if (invalidDates.length > 0) {
+        return res.status(400).json({
+            message: `Cannot cancel orders for yesterday or today (${invalidDates.join(', ')})`,
+            invalidDates
+        });
+    }
+
+    const staffUser = await User.findById(userId);
     const results = [];
     const notFound = [];
 
     for (const dateStr of requestedDates) {
+        const existingOrder = await Order.findOne({ user: userId, order_date: dateStr });
+        if (!existingOrder) {
+            notFound.push(dateStr);
+            continue;
+        }
+
+        const wasNotified = existingOrder.telegram_notified === true;
+
         const ord = await Order.findOneAndUpdate(
             { user: userId, order_date: dateStr },
             { status: 'cancelled' },
             { returnDocument: 'after' }
         );
 
-        if (!ord) {
-            notFound.push(dateStr);
-            continue;
-        }
         results.push(ord);
 
-        // Send Telegram notification (non-blocking)
-        const staffUser = await User.findById(userId);
-        if (staffUser) {
+        // Only send cancellation notification to Telegram if order confirmation was previously sent to Telegram
+        if (staffUser && wasNotified) {
             bot.sendCancellationNotification(staffUser, ord).catch(err =>
                 console.error('Portal cancel notification error:', err.message)
             );

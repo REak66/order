@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useDeferredValue } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useDeferredValue, useRef } from 'react';
 import api from '../utils/api';
 import {
   Calendar,
@@ -20,6 +20,7 @@ import SelectDateRange from '../components/SelectDateRange';
 import ConfirmModal from '../components/ConfirmModal';
 import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
+import SearchBar from '../components/SearchBar';
 import { cn } from '../utils/cx';
 
 const todayIso = format(new Date(), 'yyyy-MM-dd');
@@ -109,7 +110,7 @@ const ManualOrderRow = React.memo(({
               onClick={() => onSaveOrder(member, 'cancelled')}
               disabled={isRowSaving || isCancelDisabled}
               className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-600/10 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none dark:disabled:bg-slate-800"
-              title={isCancelDisabled ? 'Cancellation cannot be performed on past dates' : 'Cancel Order'}
+              title={isCancelDisabled ? 'Cancellation cannot be performed for yesterday or today' : 'Cancel Order'}
             >
               <XCircle size={14} />
               <span>{isSavingCancel ? 'Saving...' : isMulti ? `Cancel (${selectedDatesLength})` : 'Cancel'}</span>
@@ -206,7 +207,7 @@ const ManualOrderCard = React.memo(({
             onClick={() => onSaveOrder(member, 'cancelled')}
             disabled={isRowSaving || isCancelDisabled}
             className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-600/10 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none dark:disabled:bg-slate-800 min-h-[38px]"
-            title={isCancelDisabled ? 'Cancellation cannot be performed on past dates' : 'Cancel Order'}
+            title={isCancelDisabled ? 'Cancellation cannot be performed for yesterday or today' : 'Cancel Order'}
           >
             <XCircle size={14} />
             <span>{isSavingCancel ? 'Saving...' : isMulti ? `Cancel (${selectedDatesLength})` : 'Cancel'}</span>
@@ -240,10 +241,11 @@ const ManualOrder = () => {
   const [selectedBranches, setSelectedBranches] = useState({});
   const [statusFilter, setStatusFilter] = useState('');
   const [holidays, setHolidays] = useState([]);
-  const [isMultiDateMode, setIsMultiDateMode] = useState(false);
+  const [isMultiDateMode, setIsMultiDateMode] = useState(true);
   const [rangeStart, setRangeStart] = useState(tomorrowIso);
   const [rangeEnd, setRangeEnd] = useState(format(addDays(new Date(), 5), 'yyyy-MM-dd'));
   const [bulkSaving, setBulkSaving] = useState(false);
+  const savingInProgressRef = useRef(false);
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
@@ -373,7 +375,7 @@ const ManualOrder = () => {
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
   const isCancelDisabled = useMemo(() => {
-    return selectedDates.some(d => d < todayIso);
+    return selectedDates.some(d => d <= todayIso);
   }, [selectedDates]);
 
   const filteredStaff = useMemo(() => {
@@ -381,11 +383,18 @@ const ManualOrder = () => {
 
     const term = deferredSearchTerm.trim().toLowerCase();
     if (term) {
-      result = result.filter(member => (
-        member.full_name?.toLowerCase().includes(term) ||
-        member.username?.toLowerCase().includes(term) ||
-        member.branch?.toLowerCase().includes(term)
-      ));
+      result = result.filter(member => {
+        const memberId = member._id || member.id;
+        const currentStatus = orderStatuses[memberId] || 'not_ordered';
+        const currentBranch = selectedBranches[memberId] || member.branch || '';
+        return (
+          member.full_name?.toLowerCase().includes(term) ||
+          member.username?.toLowerCase().includes(term) ||
+          member.branch?.toLowerCase().includes(term) ||
+          currentBranch.toLowerCase().includes(term) ||
+          currentStatus.toLowerCase().includes(term)
+        );
+      });
     }
 
     if (statusFilter && selectedDates.length === 1) {
@@ -425,6 +434,12 @@ const ManualOrder = () => {
 
   const executeManualOrder = useCallback(async (member, targetStatus, overrideStandby = false) => {
     const memberId = member._id || member.id;
+    if (savingInProgressRef.current) return;
+    if (targetStatus === 'cancelled' && selectedDates.some(d => d <= todayIso)) {
+      toast.error('Cancellation is not allowed for yesterday or today');
+      return;
+    }
+    savingInProgressRef.current = true;
     const branch = selectedBranches[memberId] || member.branch || 'City Mall';
 
     setSavingId(`${memberId}-${targetStatus}`);
@@ -453,13 +468,14 @@ const ManualOrder = () => {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save manual order');
     } finally {
+      savingInProgressRef.current = false;
       setSavingId('');
     }
   }, [selectedBranches, selectedDates]);
 
   const saveManualOrder = useCallback((member, targetStatus) => {
     if (targetStatus === 'cancelled' && isCancelDisabled) {
-      toast.error('Cancellation is not allowed for past dates');
+      toast.error('Cancellation is not allowed for yesterday or today');
       return;
     }
 
@@ -484,10 +500,36 @@ const ManualOrder = () => {
         });
         return;
       }
+
+      // Check if any date in selectedDates is a Sunday for non-60M staff
+      const memberId = member._id || member.id;
+      const currentBranch = selectedBranches[memberId] || member.branch || 'City Mall';
+      const is60M = currentBranch === 'BYD 60M' || currentBranch === '60M';
+      const sundayDates = selectedDates.filter(d => {
+        const [y, m, day] = d.split('-').map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, day, 12, 0, 0));
+        return dt.getUTCDay() === 0;
+      });
+
+      if (sundayDates.length > 0 && !is60M) {
+        const sundayList = sundayDates.map(d => `• ${d} (Sunday)`).join('\n');
+        setConfirmModal({
+          isOpen: true,
+          title: 'Sunday Order Notice (BYD 60M Only)',
+          message: `Staff "${member.full_name}" is assigned to branch "${currentBranch}".\n\nSunday lunch orders are normally restricted to BYD 60M branch only:\n${sundayList}\n\nDo you want to proceed and override to place this order anyway?`,
+          variant: 'warning',
+          confirmText: 'Override & Order',
+          onConfirm: async () => {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            await executeManualOrder(member, targetStatus, true);
+          }
+        });
+        return;
+      }
     }
 
     executeManualOrder(member, targetStatus, false);
-  }, [isCancelDisabled, selectedDates, holidaysMap, executeManualOrder]);
+  }, [isCancelDisabled, selectedDates, holidaysMap, selectedBranches, executeManualOrder]);
 
   const handleDateRangeApply = ({ startDate, endDate, dates }) => {
     if (!dates || dates.length === 0) {
@@ -548,8 +590,8 @@ const ManualOrder = () => {
   const handleBulkAction = (targetStatus) => {
     if (filteredStaff.length === 0 || selectedDates.length === 0) return;
 
-    if (targetStatus === 'cancelled' && selectedDates.some(d => d < todayIso)) {
-      toast.error('Cancellation is not allowed for past dates');
+    if (targetStatus === 'cancelled' && selectedDates.some(d => d <= todayIso)) {
+      toast.error('Cancellation is not allowed for yesterday or today');
       return;
     }
 
@@ -808,7 +850,7 @@ const ManualOrder = () => {
               disabled={bulkSaving || filteredStaff.length === 0 || isCancelDisabled}
               onClick={() => handleBulkAction('cancelled')}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-sm shadow-red-600/20 transition cursor-pointer disabled:opacity-50"
-              title={isCancelDisabled ? 'Cannot cancel past dates' : 'Cancel for all filtered staff'}
+              title={isCancelDisabled ? 'Cannot cancel orders for yesterday or today' : 'Cancel for all filtered staff'}
             >
               <XCircle size={14} />
               <span>Bulk Cancel All ({filteredStaff.length})</span>
@@ -819,10 +861,10 @@ const ManualOrder = () => {
 
       {/* Filter and Search Bar */}
       <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-end">
-        <div className="space-y-1 w-full">
-          <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
-            <Utensils size={12} />
-            Status (Single Date View)
+        <div className="space-y-1.5 w-full">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+            <Utensils size={13} className="text-primary-500 shrink-0" />
+            <span>Status (Single Date View)</span>
           </label>
           <SearchSelect
             options={[
@@ -840,22 +882,13 @@ const ManualOrder = () => {
           />
         </div>
 
-        <div className="space-y-1 w-full sm:col-span-2 lg:col-span-2">
-          <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
-            <Search size={12} />
-            Search Staff
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input
-              type="text"
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200"
-              placeholder="Search name, username, branch, or standby..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
+        <SearchBar
+          label="Search Staff"
+          className="sm:col-span-2 lg:col-span-2"
+          placeholder="Search staff, branch, or status..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {/* Staff Orders Table */}

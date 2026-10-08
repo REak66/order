@@ -92,7 +92,8 @@ const initDatabase = async () => {
             { key: 'order_end_time', value: '16:00' },
             { key: 'report_time', value: '16:20' },
             { key: 'max_advance_days', value: '7' },
-            { key: 'allow_weekend_orders', value: 'false' }
+            { key: 'allow_weekend_orders', value: 'false' },
+            { key: 'sunday_order_branches', value: 'BYD 60M' }
         ];
 
         for (const setting of defaultSettings) {

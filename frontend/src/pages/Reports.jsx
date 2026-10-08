@@ -22,6 +22,7 @@ import SelectDate from '../components/SelectDate';
 import SelectMonth from '../components/SelectMonth';
 import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
+import SearchBar from '../components/SearchBar';
 import { cn } from '../utils/cx';
 
 const branchOptions = [
@@ -505,37 +506,18 @@ const Reports = () => {
 
           {/* Search Staff */}
           {!isSummaryReport && (
-            <div className={cn(
-              "w-full space-y-1.5 col-span-2 md:col-span-4",
-              filters.period === 'custom'
-                ? "lg:col-span-12 xl:col-span-4"
-                : "lg:col-span-12 xl:col-span-4"
-            )}>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                <Search size={13} className="text-primary-500 shrink-0" />
-                <span>Search Staff</span>
-              </label>
-              <div className="relative">
-                <Search className="absolute -translate-y-1/2 left-3 top-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" size={16} />
-                <input
-                  type="text"
-                  className="w-full py-2.5 pl-9 pr-8 transition border border-slate-200 dark:border-slate-700/80 outline-none bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-xs sm:text-sm shadow-xs font-medium placeholder:text-slate-400 placeholder:font-normal"
-                  placeholder="Search staff, branch, or status..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                {searchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition cursor-pointer"
-                    title="Clear search"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
+            <SearchBar
+              label="Search Staff"
+              className={cn(
+                "col-span-2 md:col-span-4",
+                filters.period === 'custom'
+                  ? "lg:col-span-12 xl:col-span-4"
+                  : "lg:col-span-12 xl:col-span-4"
+              )}
+              placeholder="Search staff, branch, or status..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           )}
         </div>
       </div>

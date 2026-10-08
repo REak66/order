@@ -18,6 +18,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import CreatableSelect from '../components/CreatableSelect';
 import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
+import SearchBar from '../components/SearchBar';
 import { cn } from '../utils/cx';
 import * as XLSX from 'xlsx';
 
@@ -549,10 +550,13 @@ const StaffManagement = () => {
         const matchesSearch = (
           s.full_name?.toLowerCase().includes(query) ||
           s.username?.toLowerCase().includes(query) ||
+          s.branch?.toLowerCase().includes(query) ||
           s.byd_id?.toLowerCase().includes(query) ||
           s.hx_id?.toLowerCase().includes(query) ||
           s.position?.toLowerCase().includes(query) ||
-          s.department?.toLowerCase().includes(query)
+          s.department?.toLowerCase().includes(query) ||
+          (s.is_standby ? 'standby' : '').includes(query) ||
+          (s.is_active ? 'active' : 'inactive').includes(query)
         );
         if (!matchesSearch) return false;
       }
@@ -625,16 +629,13 @@ const StaffManagement = () => {
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200/80 dark:border-slate-800 overflow-hidden">
         <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col xl:flex-row gap-3 sm:gap-4 items-stretch xl:items-center justify-between">
-          <div className="relative w-full xl:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
-            <input
-              type="text"
-              placeholder="Search staff, ID, name..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200 text-sm font-semibold"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+          <SearchBar
+            hasLabel={false}
+            className="xl:max-w-xs"
+            placeholder="Search staff, branch, or status..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 w-full xl:w-auto xl:min-w-[760px] shrink-0">
             <div>

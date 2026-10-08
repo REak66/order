@@ -346,4 +346,4 @@ For step-by-step instructions, see the complete [Vercel Deployment Guide](file:/
 
 ## 📄 License
 
-This project is open-source software licensed under the [MIT License](LICENSE).
+This project is open-source software licensed under the [TVR License](LICENSE).

@@ -15,6 +15,7 @@ const {
   toDisplayDate,
   parseOrderDate,
   checkDateEligibility,
+  addDaysToIso,
 } = require("../utils/dateUtils");
 const { STATUSES, SYMBOLS } = require("../utils/constants");
 const botService = require("../services/botService");
@@ -234,9 +235,10 @@ exports.getLunchReports = asyncHandler(async (req, res) => {
 exports.upsertManualOrder = asyncHandler(async (req, res) => {
   const { userId, orderDate, orderDates, status = "ordered", branch, overrideStandby = false } = req.body;
 
-  const datesToProcess = Array.isArray(orderDates) && orderDates.length > 0 
+  const rawDates = Array.isArray(orderDates) && orderDates.length > 0 
     ? orderDates 
     : (orderDate ? [orderDate] : []);
+  const datesToProcess = [...new Set(rawDates)];
 
   if (!userId || datesToProcess.length === 0) {
     return res
@@ -269,6 +271,17 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
     }
   }
 
+  // Validate cancellation: cannot cancel order for yesterday or today
+  if (status === "cancelled") {
+    for (const d of datesToProcess) {
+      if (d <= todayIso) {
+        return res
+          .status(400)
+          .json({ message: `Cannot cancel order for yesterday or today: ${d}` });
+      }
+    }
+  }
+
   const user = await User.findById(userId);
   if (!user) {
     return res.status(404).json({ message: "Staff not found" });
@@ -290,11 +303,12 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
         isAdminOverride: false
       });
 
-      if (!eligibility.eligible && eligibility.isHoliday) {
+      if (!eligibility.eligible && (eligibility.isHoliday || eligibility.reason === 'sunday_60m_only')) {
         return res.status(400).json({
           message: eligibility.message,
           reason: eligibility.reason,
-          isHoliday: true,
+          isHoliday: Boolean(eligibility.isHoliday),
+          isSundayRestricted: eligibility.reason === 'sunday_60m_only',
           holidayName: eligibility.holidayName,
           date: d,
           requiresConfirmation: true
@@ -304,18 +318,23 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
   }
 
   const results = [];
+  const today = toLocalIsoDate();
 
   for (const currentOrderDate of datesToProcess) {
+    const sendDate = addDaysToIso(currentOrderDate, -1);
+    const isImmediate = sendDate <= today;
+
     if (status === "not_ordered") {
       const existingOrder = await Order.findOne({
         user: userId,
         order_date: currentOrderDate,
       });
       const previousStatus = existingOrder?.status;
+      const wasNotified = existingOrder?.telegram_notified === true;
 
       await Order.findOneAndDelete({ user: userId, order_date: currentOrderDate });
 
-      if (previousStatus === "ordered") {
+      if (previousStatus === "ordered" && wasNotified) {
         try {
           await botService.sendCancellationNotification(user, {
             order_date: currentOrderDate,
@@ -345,22 +364,31 @@ exports.upsertManualOrder = asyncHandler(async (req, res) => {
       });
       const isNewOrder = !existingOrder;
       const previousStatus = existingOrder?.status;
+      const wasNotified = existingOrder?.telegram_notified === true;
 
       const order = await Order.findOneAndUpdate(
         { user: userId, order_date: currentOrderDate },
-        { status },
+        { 
+          status,
+          telegram_notified: status === "ordered" ? (isImmediate ? true : (existingOrder?.telegram_notified || false)) : false,
+          telegram_notified_at: status === "ordered" && isImmediate ? new Date() : (existingOrder?.telegram_notified_at || null)
+        },
         { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
       );
 
-      if (status === "ordered" && (isNewOrder || previousStatus !== "ordered")) {
-        try {
-          await botService.sendOrderNotification(user, order);
-        } catch (error) {
-          console.error("Failed to send order notification:", error.message);
+      if (status === "ordered" && (isNewOrder || previousStatus !== "ordered") && !wasNotified) {
+        // Only send immediate notification if currentOrderDate's send day is today or earlier.
+        // Future advance dates will be sent on their send date at Order Start Time.
+        if (isImmediate) {
+          try {
+            await botService.sendOrderNotification(user, order);
+          } catch (error) {
+            console.error("Failed to send order notification:", error.message);
+          }
         }
       }
 
-      if (status === "cancelled" && previousStatus !== "cancelled") {
+      if (status === "cancelled" && previousStatus !== "cancelled" && wasNotified) {
         try {
           await botService.sendCancellationNotification(user, order);
         } catch (error) {

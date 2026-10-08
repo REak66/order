@@ -61,7 +61,7 @@ const SearchSelect = ({
         if (instance) {
           try {
             if (typeof instance.close === 'function') {
-              instance.close(true);
+              instance.close(false);
             }
           } catch (e) {}
 
@@ -118,6 +118,7 @@ const SearchSelect = ({
   // JSON configuration required by FlyonUI data-select attribute
   const dataSelectConfig = {
     hasSearch: hasSearch,
+    preventSearchFocus: true,
     searchLimit: searchLimit,
     placeholder: placeholder,
     dropdownScope: dropdownScope,

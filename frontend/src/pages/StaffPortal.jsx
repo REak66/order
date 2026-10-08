@@ -27,7 +27,9 @@ import {
 import { cn } from '../utils/cx';
 import ThemeToggle from '../components/ThemeToggle';
 import StatusBadge from '../components/StatusBadge';
+import { format } from 'date-fns';
 
+const todayIso = format(new Date(), 'yyyy-MM-dd');
 const BRANCH_OPTIONS = ['City Mall', 'BYD 6A', 'BYD 60M'];
 
 // Helper: check if current local time is within start–end window
@@ -65,7 +67,7 @@ const StaffPortal = () => {
 
   // Multi-date selection state
   const [selectedDates, setSelectedDates] = useState([]);
-  const [isMultiDateMode, setIsMultiDateMode] = useState(false);
+  const [isMultiDateMode, setIsMultiDateMode] = useState(true);
   const isInitialLoad = useRef(true);
 
   // Branch editing state
@@ -108,8 +110,9 @@ const StaffPortal = () => {
       // Initialize selected date on initial mount only
       if (isInitialLoad.current) {
         isInitialLoad.current = false;
-        if (res.data?.order_date) {
-          setSelectedDates([res.data.order_date]);
+        const defaultDate = res.data?.tomorrow_date || res.data?.order_date || res.data?.horizon?.[0]?.date;
+        if (defaultDate) {
+          setSelectedDates([defaultDate]);
         }
       }
     } catch (err) {
@@ -133,6 +136,16 @@ const StaffPortal = () => {
   const horizonDays = useMemo(() => {
     return orderData?.horizon || [];
   }, [orderData?.horizon]);
+
+  // In Single Date mode, strictly default to Tomorrow Only
+  useEffect(() => {
+    if (!isMultiDateMode && orderData) {
+      const defaultTomorrow = orderData?.tomorrow_date || orderData?.order_date || horizonDays[0]?.date;
+      if (defaultTomorrow && (!selectedDates.length || selectedDates[0] !== defaultTomorrow)) {
+        setSelectedDates([defaultTomorrow]);
+      }
+    }
+  }, [isMultiDateMode, orderData, horizonDays, selectedDates]);
 
   // Toggle or select date in horizon
   const toggleDateSelection = (dateStr) => {
@@ -159,7 +172,8 @@ const StaffPortal = () => {
   const countIneligible = selectedHorizonDays.filter(h => !h.eligibility?.eligible).length;
 
   const handleOrder = async () => {
-    const tomorrowDate = orderData?.order_date || horizonDays[0]?.date;
+    if (actionLoading) return;
+    const tomorrowDate = orderData?.tomorrow_date || orderData?.order_date || horizonDays[0]?.date;
     const datesToOrder = isMultiDateMode
       ? selectedHorizonDays.filter(h => h.status !== 'ordered' && h.eligibility?.eligible).map(h => h.date)
       : (tomorrowDate ? [tomorrowDate] : []);
@@ -187,15 +201,14 @@ const StaffPortal = () => {
   };
 
   const handleCancel = async () => {
-    const tomorrowDate = orderData?.order_date || horizonDays[0]?.date;
+    if (actionLoading) return;
+    const tomorrowDate = orderData?.tomorrow_date || orderData?.order_date || horizonDays[0]?.date;
     const datesToCancel = isMultiDateMode
-      ? selectedHorizonDays.filter(h => h.status === 'ordered').map(h => h.date)
-      : (tomorrowDate ? [tomorrowDate] : []);
+      ? selectedHorizonDays.filter(h => h.status === 'ordered' && h.date > todayIso).map(h => h.date)
+      : (tomorrowDate && tomorrowDate > todayIso ? [tomorrowDate] : []);
 
     if (datesToCancel.length === 0) {
-      toast.error(isMultiDateMode
-        ? 'None of the selected dates have active orders to cancel'
-        : 'Tomorrow does not have an active order to cancel');
+      toast.error('Cancellation is not allowed for yesterday or today');
       return;
     }
 
@@ -249,16 +262,20 @@ const StaffPortal = () => {
       setLiveWithinWindow(prev => (prev !== allowed ? allowed : prev));
     };
     checkWindow();
-    const timer = setInterval(checkWindow, 15000);
+    const timer = setInterval(checkWindow, 30000);
     return () => clearInterval(timer);
   }, [win?.startTime, win?.endTime]);
 
   const isWithinWindow = liveWithinWindow;
 
   // Single date primary display: strictly tomorrow when !isMultiDateMode
-  const tomorrowDay = horizonDays.find(h => h.date === orderData?.order_date) || horizonDays[0] || null;
+  const tomorrowIso = orderData?.tomorrow_date || orderData?.order_date || horizonDays[0]?.date;
+  const tomorrowDay = horizonDays.find(h => h.date === tomorrowIso) || horizonDays[0] || null;
   const singleActiveDay = isMultiDateMode ? (selectedHorizonDays[0] || tomorrowDay) : tomorrowDay;
   const singleDateStatus = singleActiveDay?.status || orderData?.status || 'not_ordered';
+  const countCancellable = isMultiDateMode
+    ? selectedHorizonDays.filter(h => h.status === 'ordered' && h.date > todayIso).length
+    : (singleDateStatus === 'ordered' && singleActiveDay?.date && singleActiveDay.date > todayIso ? 1 : 0);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
@@ -474,8 +491,8 @@ const StaffPortal = () => {
                     type="button"
                     onClick={() => {
                       setIsMultiDateMode(false);
-                      const tomorrowIso = orderData?.order_date || horizonDays[0]?.date;
-                      if (tomorrowIso) setSelectedDates([tomorrowIso]);
+                      const targetTomorrow = orderData?.tomorrow_date || orderData?.order_date || horizonDays[0]?.date;
+                      if (targetTomorrow) setSelectedDates([targetTomorrow]);
                     }}
                     className={cn(
                       "flex-1 xs:flex-none px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer",
@@ -601,8 +618,13 @@ const StaffPortal = () => {
                                 <span className="truncate">{day.holiday?.name || 'Holiday'}</span>
                               </span>
                             ) : day.isWeekend ? (
-                              <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                Weekend
+                              <span className={cn(
+                                "inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-md border",
+                                isEligible
+                                  ? "bg-primary-100 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300 border-primary-200 dark:border-primary-800"
+                                  : "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                              )}>
+                                {isEligible ? 'Sunday (60M)' : 'Sunday'}
                               </span>
                             ) : (
                               <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
@@ -612,7 +634,7 @@ const StaffPortal = () => {
 
                             {!isEligible && (
                               <span className="text-[9px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-0.5">
-                                <Lock size={9} /> Standby only
+                                <Lock size={9} /> {day.eligibility?.reason === 'sunday_60m_only' ? '60M only' : 'Standby only'}
                               </span>
                             )}
                           </div>
@@ -679,6 +701,20 @@ const StaffPortal = () => {
                   </div>
                 )}
 
+                {!isMultiDateMode && !singleActiveDay?.holiday && singleActiveDay?.eligibility?.reason === 'sunday_60m_only' && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl flex items-start gap-2.5">
+                    <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                        Sunday Ordering Restricted (BYD 60M Only)
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                        ការកម្មង់អាហារថ្ងៃត្រង់សម្រាប់ថ្ងៃអាទិត្យ គឺអនុញ្ញាតបានតែបុគ្គលិកសាខា BYD 60M ប៉ុណ្ណោះ។
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Ordering Window Notice */}
                 {!isWithinWindow && (
                   <div className="flex items-start gap-2.5 p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
@@ -715,7 +751,7 @@ const StaffPortal = () => {
                       : singleDateStatus === 'ordered'
                         ? 'Already Ordered'
                         : !singleActiveDay?.eligibility?.eligible
-                          ? 'Date Ineligible to Order'
+                          ? (singleActiveDay?.eligibility?.reason === 'sunday_60m_only' ? '60M Branch Only' : 'Date Ineligible to Order')
                           : 'Order Lunch'}
                   </button>
 
@@ -725,21 +761,23 @@ const StaffPortal = () => {
                     disabled={
                       !isWithinWindow ||
                       actionLoading ||
-                      (!isMultiDateMode && singleDateStatus !== 'ordered') ||
-                      (isMultiDateMode && countOrdered === 0)
+                      countCancellable === 0
+                    }
+                    title={
+                      countCancellable === 0 && ((!isMultiDateMode && singleDateStatus === 'ordered') || (isMultiDateMode && countOrdered > 0))
+                        ? 'Cancellation is not allowed for yesterday or today'
+                        : ''
                     }
                     className={cn(
                       "w-full py-3.5 rounded-2xl font-semibold text-sm transition-all flex items-center justify-center gap-2",
-                      isWithinWindow &&
-                        ((!isMultiDateMode && singleDateStatus === 'ordered') ||
-                         (isMultiDateMode && countOrdered > 0))
+                      isWithinWindow && countCancellable > 0
                         ? 'border-2 border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer hover:scale-[1.01] active:scale-[0.99]'
                         : 'border-2 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
                     )}
                   >
                     {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <XCircle size={18} />}
                     {isMultiDateMode
-                      ? `Cancel Active Orders (${countOrdered})`
+                      ? `Cancel Active Orders (${countCancellable})`
                       : 'Cancel Order'}
                   </button>
                 </div>
@@ -798,7 +836,7 @@ const StaffPortal = () => {
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Mobile Cancel Button */}
-            {((!isMultiDateMode && singleDateStatus === 'ordered') || (isMultiDateMode && countOrdered > 0)) && (
+            {countCancellable > 0 && (
               <button
                 type="button"
                 onClick={handleCancel}
@@ -834,7 +872,9 @@ const StaffPortal = () => {
                   ? `Order (${countNotOrdered})`
                   : singleDateStatus === 'ordered'
                     ? 'Ordered'
-                    : 'Order Lunch'}
+                    : !singleActiveDay?.eligibility?.eligible
+                      ? (singleActiveDay?.eligibility?.reason === 'sunday_60m_only' ? '60M Only' : 'Ineligible')
+                      : 'Order Lunch'}
               </span>
             </button>
           </div>

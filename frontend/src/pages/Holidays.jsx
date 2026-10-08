@@ -18,6 +18,7 @@ import SearchSelect from '../components/SearchSelect';
 import SelectDate from '../components/SelectDate';
 import Modal from '../components/Modal';
 import ConfirmModal from '../components/ConfirmModal';
+import SearchBar from '../components/SearchBar';
 
 const Holidays = () => {
   const [holidays, setHolidays] = useState([]);
@@ -235,25 +236,13 @@ const Holidays = () => {
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200/80 dark:border-slate-800 overflow-hidden">
         {/* Filter bar matching StaffManagement toolbar */}
         <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-slate-50/50 dark:bg-slate-800/20">
-          <div className="relative w-full md:max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
-            <input
-              type="text"
-              placeholder="Search holiday name, Khmer, date..."
-              value={holidaySearch}
-              onChange={(e) => setHolidaySearch(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl outline-none focus:ring-2 focus:ring-primary-500 transition text-slate-800 dark:text-slate-200 text-sm font-semibold"
-            />
-            {holidaySearch && (
-              <button
-                type="button"
-                onClick={() => setHolidaySearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5 rounded-full"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
+          <SearchBar
+            hasLabel={false}
+            className="md:max-w-sm"
+            placeholder="Search holiday name, Khmer, date..."
+            value={holidaySearch}
+            onChange={(e) => setHolidaySearch(e.target.value)}
+          />
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-between md:justify-end">
             <div className="flex items-center gap-2 w-full sm:w-auto">

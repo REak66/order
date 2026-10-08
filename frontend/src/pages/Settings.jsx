@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 import {
   Save,
@@ -16,7 +16,9 @@ import {
   Sunset,
   RefreshCw,
   Calendar,
-  CalendarRange
+  CalendarRange,
+  Check,
+  ChevronDown
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { addDays, format, endOfMonth } from 'date-fns';
@@ -25,6 +27,7 @@ import SearchSelect from '../components/SearchSelect';
 import TimePicker from '../components/TimePicker';
 import SelectDate from '../components/SelectDate';
 import ConfirmModal from '../components/ConfirmModal';
+import SundayBranchDropdown, { AVAILABLE_SUNDAY_BRANCHES } from '../components/SundayBranchDropdown';
 import { cn } from '../utils/cx';
 
 const normalizeTimeValue = (value) => {
@@ -71,6 +74,7 @@ const Settings = () => {
     // Ordering Horizon & Weekends
     max_advance_days: '7',
     allow_weekend_orders: 'false',
+    sunday_order_branches: 'BYD 60M',
     order_horizon_mode: 'rolling',
     order_range_start_date: '',
     order_range_end_date: ''
@@ -496,32 +500,22 @@ const Settings = () => {
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        Weekend Orders (Sat / Sun)
+                        Sunday Order for Branch
                       </label>
-                      <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-xl">
-                        <div>
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {settings.allow_weekend_orders === 'true' ? 'Enabled' : 'Disabled (Blocked)'}
-                          </span>
-                          <p className="text-xs text-slate-400">
-                            {settings.allow_weekend_orders === 'true'
-                              ? 'Users can order lunches on Saturdays and Sundays'
-                              : 'Orders on weekends are rejected as non-working days'}
-                          </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer select-none shrink-0 ml-3">
-                          <input
-                            type="checkbox"
-                            className="sr-only peer"
-                            checked={settings.allow_weekend_orders === 'true'}
-                            onChange={(e) => setSettings({
-                              ...settings,
-                              allow_weekend_orders: e.target.checked ? 'true' : 'false'
-                            })}
-                          />
-                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                        </label>
-                      </div>
+                      <SundayBranchDropdown
+                        value={settings.sunday_order_branches}
+                        onChange={(val) => {
+                          const list = val.split(',').map(s => s.trim()).filter(Boolean);
+                          setSettings(prev => ({
+                            ...prev,
+                            sunday_order_branches: val,
+                            allow_weekend_orders: list.length === AVAILABLE_SUNDAY_BRANCHES.length ? 'true' : 'false'
+                          }));
+                        }}
+                      />
+                      <p className="text-xs text-slate-400">
+                        Admin can select which branch(es) are permitted to order lunch on Sundays.
+                      </p>
                     </div>
                   </div>
                 ) : (
@@ -590,6 +584,7 @@ const Settings = () => {
                           placeholder="Select start date"
                           className="w-full"
                         />
+                        <p className="text-xs text-slate-400">First date staff can order for</p>
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -601,30 +596,24 @@ const Settings = () => {
                           placeholder="Select end date"
                           className="w-full"
                         />
+                        <p className="text-xs text-slate-400">Last date staff can order for</p>
                       </div>
                       <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                          Weekend Orders (Sat / Sun)
+                          Sunday Order for Branch
                         </label>
-                        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl min-h-[46px]">
-                          <div>
-                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                              {settings.allow_weekend_orders === 'true' ? 'Enabled' : 'Disabled (Blocked)'}
-                            </span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer select-none shrink-0 ml-2">
-                            <input
-                              type="checkbox"
-                              className="sr-only peer"
-                              checked={settings.allow_weekend_orders === 'true'}
-                              onChange={(e) => setSettings({
-                                ...settings,
-                                allow_weekend_orders: e.target.checked ? 'true' : 'false'
-                              })}
-                            />
-                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                          </label>
-                        </div>
+                        <SundayBranchDropdown
+                          value={settings.sunday_order_branches}
+                          onChange={(val) => {
+                            const list = val.split(',').map(s => s.trim()).filter(Boolean);
+                            setSettings(prev => ({
+                              ...prev,
+                              sunday_order_branches: val,
+                              allow_weekend_orders: list.length === AVAILABLE_SUNDAY_BRANCHES.length ? 'true' : 'false'
+                            }));
+                          }}
+                        />
+                        <p className="text-xs text-slate-400">Branch(es) permitted on Sundays</p>
                       </div>
                     </div>
                   </div>

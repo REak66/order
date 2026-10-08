@@ -93,20 +93,51 @@ const checkDateEligibility = async ({
         }
     }
 
-    // 3. Weekend Check (Sat = 6, Sun = 0)
-    const allowWeekendsStr = await getSettingValue('allow_weekend_orders', 'false');
-    const allowWeekends = allowWeekendsStr === 'true';
+    // 3. Weekend Check: Saturday is a normal working day; Sunday is the only weekend day
     const dayOfWeek = getDayOfWeek(targetDate);
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
+    const isWeekend = isSunday; // Saturday (dayOfWeek === 6) is a normal working day for all branches
 
-    if (!isAdminOverride && isWeekend && !allowWeekends) {
-        const dayLabel = dayOfWeek === 0 ? 'ថ្ងៃអាទិត្យ (Sunday)' : 'ថ្ងៃសៅរ៍ (Saturday)';
-        return {
-            eligible: false,
-            reason: 'weekend_closed',
-            isWeekend: true,
-            message: `ថ្ងៃទី ${toOrderInputDate(targetDate)} គឺ ${dayLabel} ជាថ្ងៃឈប់សម្រាកចុងសប្តាហ៍ មិនមានការកម្មង់អាហារទេ`
-        };
+    if (!isAdminOverride && isSunday) {
+        const allowWeekendsStr = await getSettingValue('allow_weekend_orders', 'false');
+        const allowWeekends = allowWeekendsStr === 'true';
+
+        // Unless weekend orders are globally enabled for all branches, check allowed Sunday branches
+        if (!allowWeekends) {
+            const sundayBranchesStr = await getSettingValue('sunday_order_branches', 'BYD 60M');
+            let allowedBranches = [];
+            try {
+                if (sundayBranchesStr.startsWith('[')) {
+                    allowedBranches = JSON.parse(sundayBranchesStr);
+                } else {
+                    allowedBranches = sundayBranchesStr.split(',').map(s => s.trim()).filter(Boolean);
+                }
+            } catch {
+                allowedBranches = [sundayBranchesStr.trim()];
+            }
+
+            if (allowedBranches.length === 0) {
+                allowedBranches = ['BYD 60M'];
+            }
+
+            const userBranch = user?.branch ? String(user.branch).trim() : '';
+            const isBranchAllowed = allowedBranches.some(b => {
+                const normB = b.toLowerCase().replace(/\s+/g, '');
+                const normUser = userBranch.toLowerCase().replace(/\s+/g, '');
+                return normB === normUser || (normB === 'byd60m' && /60m/i.test(normUser));
+            });
+
+            if (!isBranchAllowed) {
+                const allowedList = allowedBranches.join(', ');
+                return {
+                    eligible: false,
+                    reason: 'sunday_60m_only',
+                    allowedBranches,
+                    isWeekend: true,
+                    message: `ថ្ងៃទី ${toOrderInputDate(targetDate)} គឺ ថ្ងៃអាទិត្យ (Sunday) អនុញ្ញាតឱ្យកម្មង់បានតែបុគ្គលិកសាខា ${allowedList} ប៉ុណ្ណោះ`
+                };
+            }
+        }
     }
 
     // 4. Public Holiday Check

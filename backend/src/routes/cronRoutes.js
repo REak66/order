@@ -109,9 +109,30 @@ router.get('/tick', verifyCron, async (req, res) => {
         }
 
 
+        // Run pending advance order notifications (at order_start_time)
+        try {
+            await botService.sendPendingOrderNotificationsIfDue();
+            results.orderNotifications = 'success';
+        } catch (e) {
+            results.orderNotifications = `error: ${e.message}`;
+        }
+
         return res.json({ success: true, results });
     } catch (error) {
         console.error('[Cron] Tick failed:', error.message);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// 5. Trigger pending advance order notifications directly
+router.get('/order-notifications', verifyCron, async (req, res) => {
+    try {
+        console.log('[Cron] Checking/sending pending advance order notifications...');
+        await botService.getRunningBot();
+        await botService.sendPendingOrderNotificationsIfDue();
+        return res.json({ success: true, message: 'Pending advance order notifications processed' });
+    } catch (error) {
+        console.error('[Cron] Order notifications error:', error.message);
         return res.status(500).json({ error: error.message });
     }
 });

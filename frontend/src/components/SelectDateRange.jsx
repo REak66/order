@@ -102,7 +102,7 @@ const SelectDateRange = ({
       if (!isValid(s) || !isValid(e) || isBefore(e, s)) return [];
 
       return eachDayOfInterval({ start: s, end: e })
-        .filter(d => !excludeWeekends || !isWeekend(d))
+        .filter(d => !excludeWeekends || d.getDay() !== 0)
         .map(d => format(d, 'yyyy-MM-dd'));
     } catch {
       return [];
@@ -115,7 +115,7 @@ const SelectDateRange = ({
     let days = [];
     let curr = isValid(startDay) ? startDay : addDays(new Date(), 1);
     while (days.length < 5) {
-      if (!isWeekend(curr)) {
+      if (curr.getDay() !== 0) {
         days.push(curr);
       }
       curr = addDays(curr, 1);
@@ -129,8 +129,8 @@ const SelectDateRange = ({
     const startDay = min ? parseISO(min) : addDays(new Date(), 1);
     let days = [];
     let curr = isValid(startDay) ? startDay : addDays(new Date(), 1);
-    while (days.length < 10) {
-      if (!isWeekend(curr)) {
+    while (days.length < 12) {
+      if (curr.getDay() !== 0) {
         days.push(curr);
       }
       curr = addDays(curr, 1);
@@ -345,9 +345,9 @@ const SelectDateRange = ({
                   <div className="p-3 sm:p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
                     <div>
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
-                        Exclude Weekends (Mon-Fri only)
+                        Exclude Sunday (Mon-Sat working days)
                       </span>
-                      <p className="text-[11px] text-slate-400">Skip Saturdays & Sundays automatically</p>
+                      <p className="text-[11px] text-slate-400">Skip Sundays automatically (Saturday is a working day)</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer select-none shrink-0">
                       <input

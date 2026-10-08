@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS = {
     // Ordering Horizon & Weekend Options
     max_advance_days: '7',
     allow_weekend_orders: 'false',
+    sunday_order_branches: 'BYD 60M',
     order_horizon_mode: 'rolling', // 'rolling' or 'date_range'
     order_range_start_date: '',
     order_range_end_date: ''

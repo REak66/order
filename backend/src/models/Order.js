@@ -15,10 +15,18 @@ const OrderSchema = new mongoose.Schema({
         default: 'Chinese Food',
         required: true
     },
+    telegram_notified: {
+        type: Boolean,
+        default: false
+    },
+    telegram_notified_at: {
+        type: Date
+    },
     created_at: { type: Date, default: Date.now }
 });
 
 OrderSchema.index({ user: 1, order_date: 1 }, { unique: true });
 OrderSchema.index({ order_date: 1, status: 1 });
+OrderSchema.index({ order_date: 1, status: 1, telegram_notified: 1 });
 
 module.exports = mongoose.model('Order', OrderSchema);

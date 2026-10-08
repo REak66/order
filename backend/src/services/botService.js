@@ -13,6 +13,7 @@ const {
     toOrderInputDate,
     getExpectedOrderIsoDate,
     getLunchDate,
+    addDaysToIso,
     checkDateEligibility
 } = require('../utils/dateUtils');
 require('dotenv').config();
@@ -589,14 +590,7 @@ const registerHandlers = (telegramBot) => {
             }
 
             if (!user) {
-                return ctx.reply(
-                    `❌ មិនស្គាល់គណនីរបស់អ្នកទេ (Unknown staff).\n\n` +
-                    `សូមប្រាកដថាអ្នកបានបញ្ជាក់ឈ្មោះត្រឹមត្រូវ ដូចជា:\n` +
-                    `- Name : [ឈ្មោះពេញរបស់អ្នក]\n` +
-                    `- Brand : BYD 6A\n` +
-                    `- Order on DD-MM-YYYY ✅`,
-                    { reply_to_message_id: ctx.message.message_id }
-                );
+                return;
             }
 
             // Auto-bind telegram_id if not linked
@@ -644,6 +638,8 @@ const registerHandlers = (telegramBot) => {
                 if (!eligibility.eligible) {
                     if (eligibility.reason === 'holiday_standby_only') {
                         results.push(`• ${displayDate}: 🚫 ${eligibility.holidayName || 'ថ្ងៃឈប់សម្រាកបុណ្យជាតិ'} (សម្រាប់តែបុគ្គលិក Standby)`);
+                    } else if (eligibility.reason === 'sunday_60m_only') {
+                        results.push(`• ${displayDate}: ❌ ថ្ងៃអាទិត្យសម្រាប់តែបុគ្គលិកសាខា ${eligibility.allowedBranches?.join(', ') || 'BYD 60M'} ប៉ុណ្ណោះ`);
                     } else if (eligibility.reason === 'past_date') {
                         results.push(`• ${displayDate}: ❌ មិនអាចកម្មង់កាលបរិច្ឆេទកន្លងផុត`);
                     } else if (eligibility.reason === 'weekend_closed') {
@@ -659,9 +655,18 @@ const registerHandlers = (telegramBot) => {
                 const isManagement = isManagementPosition(user.position);
                 const food_type = isManagement ? 'Chinese Food' : 'Chinese Food';
 
+                const today = toLocalIsoDate();
+                const sendDate = addDaysToIso(targetDate, -1);
+                const isImmediate = sendDate <= today;
+
                 await Order.findOneAndUpdate(
                     { user: user._id, order_date: targetDate },
-                    { status: 'ordered', food_type },
+                    { 
+                        status: 'ordered', 
+                        food_type,
+                        telegram_notified: isImmediate,
+                        telegram_notified_at: isImmediate ? new Date() : null
+                    },
                     { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
                 );
 
@@ -687,7 +692,6 @@ const registerHandlers = (telegramBot) => {
             // 7. Update reports
             for (const sDate of successfulDates) {
                 try {
-                    await sendDailyReportUpdate(user, sDate, oldBranch);
                     await sendSupplyReportUpdate(sDate);
                 } catch (reportErr) {
                     console.error(`Report update error for ${sDate}:`, reportErr.message);
@@ -872,8 +876,15 @@ const runIfDueToday = async (settingMinutes, stateKey, today, action) => {
     if (settingMinutes === null || getLocalMinutes() < settingMinutes) return;
     const lastSent = await getPersistentState(stateKey);
     if (lastSent === today) return;
-    await action();
+
+    // Immediately record today's date before executing action
+    // to prevent race conditions or duplicate sends across concurrent triggers
     await setPersistentState(stateKey, today);
+    try {
+        await action();
+    } catch (err) {
+        console.error(`Error executing action for ${stateKey}:`, err.message);
+    }
 };
 
 const sendDailyReportIfDue = async () => {
@@ -882,11 +893,13 @@ const sendDailyReportIfDue = async () => {
 
     const today = toLocalIsoDate();
     const orderDate = getExpectedOrderIsoDate();
+    const mainGroupId = await getGroupId();
 
     // 1. Branch reports
     for (const branch of BRANCHES) {
         const branchGroupId = await getBranchGroupId(branch.name);
         if (!branchGroupId) continue;
+        if (mainGroupId && branchGroupId === mainGroupId) continue;
 
         const branchReportTime = await getBranchSettingValue(branch.name, 'report_time');
         const settingMinutes = parseTimeToMinutes(branchReportTime);
@@ -900,7 +913,6 @@ const sendDailyReportIfDue = async () => {
     }
 
     // 2. Main group report
-    const mainGroupId = await getGroupId();
     if (mainGroupId) {
         const mainMinutes = parseTimeToMinutes(await getSettingValue('report_time'));
         await runIfDueToday(mainMinutes, 'last_report_date', today, async () => {
@@ -908,6 +920,77 @@ const sendDailyReportIfDue = async () => {
             await replaceGroupMessage(runningBot, mainGroupId, report, null, `last_msg_id_${mainGroupId}`, orderDate);
             console.log(`Sent main daily report to group ${mainGroupId}`);
         });
+    }
+};
+
+/**
+ * Processes advance / multi-date orders that are scheduled to send today.
+ * Follows the branch's (or global) order_start_time.
+ * Sends the standard single order confirmation message:
+ * ✅ Order Confirmed
+ * 👤 ឈ្មោះ: ...
+ * 🏢 សាខា: ...
+ * 📅 ថ្ងៃទី: DD/MM/YYYY
+ */
+const sendPendingOrderNotificationsIfDue = async () => {
+    const runningBot = await getRunningBot();
+    if (!runningBot) return;
+
+    const today = toLocalIsoDate();
+    const targetLunchDate = getLunchDate();
+    const currentMinutes = getLocalMinutes();
+
+    // Query active orders for tomorrow's lunch where Telegram confirmation hasn't been sent yet
+    const pendingOrders = await Order.find({
+        order_date: targetLunchDate,
+        status: 'ordered',
+        telegram_notified: { $ne: true }
+    }).populate('user');
+
+    if (!pendingOrders || pendingOrders.length === 0) return;
+
+    for (const order of pendingOrders) {
+        try {
+            const user = order.user;
+            if (!user) continue;
+
+            const branchName = user.branch || 'City Mall';
+            const branchStartTime = await getBranchSettingValue(branchName, 'order_start_time');
+            const startMinutes = parseTimeToMinutes(branchStartTime) ?? parseTimeToMinutes('07:00');
+
+            // Do not send until the branch's order_start_time has arrived
+            if (currentMinutes < startMinutes) {
+                continue;
+            }
+
+            // ATOMIC CLAIM: lock this order immediately before sending so no concurrent cron/worker can double-send
+            const claimed = await Order.findOneAndUpdate(
+                { _id: order._id, telegram_notified: { $ne: true }, status: 'ordered' },
+                { $set: { telegram_notified: true, telegram_notified_at: new Date() } },
+                { returnDocument: 'after' }
+            );
+
+            if (!claimed) {
+                // Already claimed or notified by another process/worker
+                continue;
+            }
+
+            const sent = await sendOrderNotification(user, claimed);
+            if (sent) {
+                console.log(`[ScheduledNotification] Sent single-order confirmation for ${user.full_name} (${user.branch}) - Lunch: ${targetLunchDate}`);
+            } else {
+                // If sending failed, release claim so it can retry later
+                await Order.updateOne(
+                    { _id: order._id, telegram_notified: true },
+                    { $set: { telegram_notified: false }, $unset: { telegram_notified_at: 1 } }
+                );
+            }
+
+            // Small delay to protect against Telegram rate limiting
+            await new Promise(r => setTimeout(r, 100));
+        } catch (err) {
+            console.error(`[ScheduledNotification] Error sending notification for order ${order._id}:`, err.message);
+        }
     }
 };
 
@@ -1197,6 +1280,12 @@ const sendLunchReminderNow = async (slotKey = null) => {
 
 // ─── Notification Helpers ─────────────────────────────────────────────────────
 
+const normalizeGroupId = (id) => String(id || '').trim().replace(/^-100/, '-');
+const areSameGroup = (id1, id2) => {
+    if (!id1 || !id2) return false;
+    return normalizeGroupId(id1) === normalizeGroupId(id2);
+};
+
 /**
  * Sends a plain (non-replacing) message to both the branch and main group.
  * Used for one-off notification headers.
@@ -1205,27 +1294,15 @@ const sendToGroups = async (runningBot, mainGroupId, branchGroupId, message) => 
     if (branchGroupId) {
         await runningBot.telegram.sendMessage(branchGroupId, message);
     }
-    if (mainGroupId && mainGroupId !== branchGroupId) {
+    if (mainGroupId && !areSameGroup(mainGroupId, branchGroupId)) {
         await runningBot.telegram.sendMessage(mainGroupId, message);
     }
 };
 
 /**
- * Sends an updated report to both the branch and main group,
- * replacing (deleting) the previous report message in each group.
- */
-const sendReportToGroups = async (runningBot, mainGroupId, branchGroupId, report, orderDate = null) => {
-    if (branchGroupId) {
-        await replaceGroupMessage(runningBot, branchGroupId, report, null, `last_msg_id_${branchGroupId}`, orderDate);
-    }
-    if (mainGroupId && mainGroupId !== branchGroupId) {
-        await replaceGroupMessage(runningBot, mainGroupId, report, null, `last_msg_id_${mainGroupId}`, orderDate);
-    }
-};
-
-/**
  * Shared notification sender.
- * Sends TWO messages: (1) a short notification header, (2) the full daily report.
+ * Sends ONLY the notification header (e.g., Order Confirmed, Order Cancelled).
+ * Daily report is strictly scheduled to send once per day at Report Send Time.
  */
 const sendNotification = async (user, order, buildHeader) => {
     const runningBot = await getRunningBot();
@@ -1238,27 +1315,9 @@ const sendNotification = async (user, order, buildHeader) => {
         const orderDate = resolveOrderDate(order.order_date);
         const displayDate = isoToDisplayDate(orderDate);
         const header = buildHeader(user, displayDate);
-        const report = await buildDailySum(orderDate);
 
-        // Message 1: notification header (always new)
+        // Send notification header (always new)
         await sendToGroups(runningBot, mainGroupId, branchGroupId, header);
-
-        // Message 2: full updated report (replaces old report)
-        // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
-        const inBranchWindow = user.branch ? await isBranchOrderingAllowed(user.branch) : false;
-        const inGlobalWindow = await isOrderingAllowed();
-
-        if (branchGroupId && !inBranchWindow) {
-            await replaceGroupMessage(runningBot, branchGroupId, report, null, `last_msg_id_${branchGroupId}`, orderDate);
-        } else if (branchGroupId) {
-            console.log(`[Notification] Skipped daily report update for branch group ${branchGroupId} during ordering window.`);
-        }
-
-        if (mainGroupId && mainGroupId !== branchGroupId && !inGlobalWindow) {
-            await replaceGroupMessage(runningBot, mainGroupId, report, null, `last_msg_id_${mainGroupId}`, orderDate);
-        } else if (mainGroupId && mainGroupId !== branchGroupId) {
-            console.log(`[Notification] Skipped daily report update for main group ${mainGroupId} during ordering window.`);
-        }
 
         return true;
     } catch (error) {
@@ -1301,34 +1360,24 @@ const sendBranchUpdateNotification = async (user, order, oldBranch = null) => {
             `🏢 សាខាថ្មី: ${user.branch}\n` +
             `📅 ថ្ងៃទី: ${displayDate}`;
 
-        const fullReport = await buildDailySum(orderDate);
-
-        // Collect unique group IDs to notify
-        const groupsToNotify = new Set();
-        if (newBranchGroupId) groupsToNotify.add(newBranchGroupId);
-        if (oldBranchGroupId && oldBranchGroupId !== newBranchGroupId) groupsToNotify.add(oldBranchGroupId);
-        if (mainGroupId && !groupsToNotify.has(mainGroupId)) groupsToNotify.add(mainGroupId);
+        // Collect unique group IDs to notify (normalized)
+        const groupsToNotify = [];
+        const seen = new Set();
+        const addGroup = (gid) => {
+            if (!gid) return;
+            const norm = normalizeGroupId(gid);
+            if (!seen.has(norm)) {
+                seen.add(norm);
+                groupsToNotify.push(gid);
+            }
+        };
+        addGroup(newBranchGroupId);
+        addGroup(oldBranchGroupId);
+        addGroup(mainGroupId);
 
         for (const gid of groupsToNotify) {
-            // Message 1: notification header (always new)
+            // Notification header (always new)
             await runningBot.telegram.sendMessage(gid, header);
-
-            // Message 2: full updated report (replaces old report)
-            // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
-            let inWindow = false;
-            if (gid === mainGroupId) {
-                inWindow = await isOrderingAllowed();
-            } else if (gid === newBranchGroupId && user.branch) {
-                inWindow = await isBranchOrderingAllowed(user.branch);
-            } else if (gid === oldBranchGroupId && oldBranch) {
-                inWindow = await isBranchOrderingAllowed(oldBranch);
-            }
-
-            if (!inWindow) {
-                await replaceGroupMessage(runningBot, gid, fullReport, null, `last_msg_id_${gid}`, orderDate);
-            } else {
-                console.log(`[Notification] Skipped daily report update for group ${gid} during ordering window.`);
-            }
         }
 
         return true;
@@ -1341,102 +1390,13 @@ const sendBranchUpdateNotification = async (user, order, oldBranch = null) => {
 // ─── Report Update ────────────────────────────────────────────────────────────
 
 /**
- * Re-sends updated daily reports to relevant groups when an order is
- * created, cancelled, or branch-changed.
- *
- * @param {object} user - The user document (must have `.branch`)
- * @param {string} orderDate - ISO date string (e.g. '2025-01-15')
- * @param {string|null} oldBranch - Previous branch name if a branch change occurred
+ * Kept for backwards compatibility with existing callers.
+ * Daily Report is designed to send strictly once per day at Report Send Time,
+ * so individual order changes during or after ordering hours do NOT re-send the daily report.
  */
-const sendDailyReportUpdate = async (user, orderDate, oldBranch = null) => {
-    const runningBot = await getRunningBot();
-    if (!runningBot) return;
-
-    const today = toLocalIsoDate();
-    const lunchDate = getExpectedOrderIsoDate();
-
-    /**
-     * Returns true if the daily report for this group has already been
-     * sent and thus needs to be re-sent with updated data.
-     */
-    const hasReportBeenSent = async (oDate, branchName = null) => {
-        // 1. If target date is the expected lunch date, check whether scheduled report was sent today
-        if (oDate === lunchDate) {
-            const stateKey = branchName
-                ? `last_report_date_${branchName.toLowerCase().replace(/\s+/g, '_')}`
-                : 'last_report_date';
-            return (await getPersistentState(stateKey)) === today;
-        }
-
-        // 2. If target date is today's lunch date (or an active tracked date),
-        // check if a message was already posted for this date
-        const gid = branchName ? await getBranchGroupId(branchName) : await getGroupId();
-        if (gid) {
-            const msgForDate = await getPersistentState(`last_msg_id_${gid}_${oDate}`);
-            if (msgForDate) return true;
-        }
-
-        return false;
-    };
-
-    const mainGroupId = await getGroupId();
-
-    // 1. Re-send main group report
-    if (mainGroupId && await hasReportBeenSent(orderDate)) {
-        // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
-        const inWindow = await isOrderingAllowed();
-        if (!inWindow) {
-            try {
-                const report = await buildDailyReport(orderDate);
-                await replaceGroupMessage(runningBot, mainGroupId, report, null, `last_msg_id_${mainGroupId}`, orderDate);
-                console.log(`Sent updated main report for date ${orderDate} to group ${mainGroupId}`);
-            } catch (error) {
-                console.error('Error sending main report update:', error.message);
-            }
-        } else {
-            console.log(`[ReportUpdate] Skipped main report update because current time is in the ordering window.`);
-        }
-    }
-
-    // 2. Re-send new branch group report
-    if (user?.branch) {
-        const newBranchGroupId = await getBranchGroupId(user.branch);
-        if (newBranchGroupId && newBranchGroupId !== mainGroupId && await hasReportBeenSent(orderDate, user.branch)) {
-            // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
-            const inWindow = await isBranchOrderingAllowed(user.branch);
-            if (!inWindow) {
-                try {
-                    const report = await buildDailyReportForBranch(user.branch, orderDate);
-                    await replaceGroupMessage(runningBot, newBranchGroupId, report, null, `last_msg_id_${newBranchGroupId}`, orderDate);
-                    console.log(`Sent updated report for branch ${user.branch} to group ${newBranchGroupId}`);
-                } catch (error) {
-                    console.error(`Error sending branch report update for ${user.branch}:`, error.message);
-                }
-            } else {
-                console.log(`[ReportUpdate] Skipped branch report update for ${user.branch} because it is in the ordering window.`);
-            }
-        }
-    }
-
-    // 3. Re-send old branch group report (if branch was changed)
-    if (oldBranch && oldBranch !== user?.branch) {
-        const oldBranchGroupId = await getBranchGroupId(oldBranch);
-        if (oldBranchGroupId && oldBranchGroupId !== mainGroupId && await hasReportBeenSent(orderDate, oldBranch)) {
-            // Skip sending the daily report update if within the ordering window (Order Start Time - Order End Time)
-            const inWindow = await isBranchOrderingAllowed(oldBranch);
-            if (!inWindow) {
-                try {
-                    const report = await buildDailyReportForBranch(oldBranch, orderDate);
-                    await replaceGroupMessage(runningBot, oldBranchGroupId, report, null, `last_msg_id_${oldBranchGroupId}`, orderDate);
-                    console.log(`Sent updated report for old branch ${oldBranch} to group ${oldBranchGroupId}`);
-                } catch (error) {
-                    console.error(`Error sending report update for old branch ${oldBranch}:`, error.message);
-                }
-            } else {
-                console.log(`[ReportUpdate] Skipped old branch report update for ${oldBranch} because it is in the ordering window.`);
-            }
-        }
-    }
+const sendDailyReportUpdate = async (_user, _orderDate, _oldBranch = null) => {
+    // No-op: Daily Report is sent only one time per day at Report Send Time.
+    return;
 };
 
 // ─── Supply Report Update (after manual order change) ───────────────────────
@@ -1533,6 +1493,7 @@ const handleWebhook = async (req, res, next) => {
 
 if (!process.env.VERCEL) {
     const CRON_OPTS = { timezone: TIME_ZONE };
+    cron.schedule('* * * * *', () => sendPendingOrderNotificationsIfDue(), CRON_OPTS);
     cron.schedule('* * * * *', () => sendDailyReportIfDue(), CRON_OPTS);
     cron.schedule('* * * * *', () => syncGroupMuteState(), CRON_OPTS);
     cron.schedule('* * * * *', () => sendSupplyReportIfDue(), CRON_OPTS);
@@ -1559,6 +1520,7 @@ module.exports = {
     sendDailyReportUpdate,
     sendSupplyReportUpdate,
     sendOrderReminderIfDue,
+    sendPendingOrderNotificationsIfDue,
     sendDailyReportIfDue,
     sendSupplyReportIfDue,
     getBranchSettingValue,
