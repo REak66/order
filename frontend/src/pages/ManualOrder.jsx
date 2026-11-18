@@ -291,8 +291,8 @@ const ManualOrder = () => {
     for (let i = 1; i <= 7; i++) {
       const d = addDays(new Date(), i);
       const dateStr = format(d, 'yyyy-MM-dd');
-      const dayOfWeek = d.getDay(); // 0 is Sun, 6 is Sat
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const dayOfWeek = d.getDay(); // 0 is Sun
+      const isWeekend = dayOfWeek === 0;
       const holiday = holidaysMap[dateStr];
       days.push({
         dateStr,
@@ -482,7 +482,7 @@ const ManualOrder = () => {
     // Check if any date in selectedDates is a Public Holiday
     if (targetStatus === 'ordered') {
       const holidayDates = selectedDates.filter(d => holidaysMap[d]);
-      if (holidayDates.length > 0 && !member.is_standby) {
+      if (holidayDates.length > 0 && !member.is_standby && !/60m/i.test(String(member.branch || '').replace(/\s+/g, ''))) {
         const holidayList = holidayDates
           .map(d => `• ${d}: ${holidaysMap[d].name}`)
           .join('\n');
@@ -490,7 +490,7 @@ const ManualOrder = () => {
         setConfirmModal({
           isOpen: true,
           title: 'Standby Permission Notice',
-          message: `Staff "${member.full_name}" is NOT designated as Standby duty.\n\nThe following selected date(s) are registered Public Holidays:\n${holidayList}\n\nDo you want to proceed and override to place this order anyway?`,
+          message: `Staff "${member.full_name}" is NOT designated as Standby duty or 60M branch.\n\nThe following selected date(s) are registered Public Holidays:\n${holidayList}\n\nDo you want to proceed and override to place this order anyway?`,
           variant: 'warning',
           confirmText: 'Override & Order',
           onConfirm: async () => {

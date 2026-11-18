@@ -6,6 +6,8 @@ const bot = require('../services/botService');
 const bcrypt = require('bcryptjs');
 const { getLunchDate, getCambodiaTimeComponents, addDaysToIso, toLocalIsoDate } = require('../utils/dateUtils');
 const { checkDateEligibility } = require('../utils/eligibilityEngine');
+const Holiday = require('../models/Holiday');
+const { getDayOfWeek } = require('../utils/dateUtils');
 
 // Helper: get setting value by key
 const getSetting = async (key, defaultValue = '') => {
@@ -319,6 +321,30 @@ exports.cancelOrder = asyncHandler(async (req, res) => {
 // PATCH /api/portal/branch
 const VALID_BRANCHES = ['City Mall', 'BYD 6A', 'BYD 60M'];
 
+const horizonHasSundayOrHoliday = async () => {
+    const horizonMode = await getSetting('order_horizon_mode', 'rolling');
+    const rangeStart = await getSetting('order_range_start_date', '');
+    const rangeEnd = await getSetting('order_range_end_date', '');
+    const khParts = getCambodiaTimeComponents();
+    const todayIso = `${khParts.year}-${String(khParts.month).padStart(2, '0')}-${String(khParts.day).padStart(2, '0')}`;
+    const tomorrowIso = addDaysToIso(todayIso, 1);
+
+    const dates = [];
+    if (horizonMode === 'date_range' && rangeStart && rangeEnd) {
+        let curr = rangeStart < tomorrowIso ? tomorrowIso : rangeStart;
+        for (let i = 0; curr <= rangeEnd && i < 60; i++) {
+            dates.push(curr);
+            curr = addDaysToIso(curr, 1);
+        }
+    } else {
+        const maxAdvanceDays = parseInt(await getSetting('max_advance_days', '7'), 10) || 7;
+        for (let i = 1; i <= maxAdvanceDays; i++) dates.push(addDaysToIso(todayIso, i));
+    }
+
+    if (dates.some(d => getDayOfWeek(d) === 0)) return true;
+    return Boolean(await Holiday.exists({ date: { $in: dates }, is_active: true }));
+};
+
 exports.updateBranch = asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const { branch } = req.body;
@@ -333,6 +359,13 @@ exports.updateBranch = asyncHandler(async (req, res) => {
         return res.status(404).json({ message: 'Staff not found' });
     }
     const oldBranch = existingStaff.branch;
+
+    // Holidays and Sundays are 60M-gated, so branch switching is locked while one is in the ordering horizon
+    if (branch !== oldBranch && await horizonHasSundayOrHoliday()) {
+        return res.status(403).json({
+            message: 'Branch cannot be changed while a Sunday or public holiday is within the ordering period. Please contact an admin.'
+        });
+    }
 
     const staff = await User.findByIdAndUpdate(userId, { branch }, { returnDocument: 'after' });
 

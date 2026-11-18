@@ -34,6 +34,9 @@ const getSettingValue = async (key, defaultValue = '') => {
  *   isWeekend?: boolean
  * }>}
  */
+const isBranch60M = (user) =>
+    /60m/i.test(String(user?.branch || '').replace(/\s+/g, ''));
+
 const checkDateEligibility = async ({
     targetDate,
     user = {},
@@ -124,7 +127,7 @@ const checkDateEligibility = async ({
             const isBranchAllowed = allowedBranches.some(b => {
                 const normB = b.toLowerCase().replace(/\s+/g, '');
                 const normUser = userBranch.toLowerCase().replace(/\s+/g, '');
-                return normB === normUser || (normB === 'byd60m' && /60m/i.test(normUser));
+                return normB === normUser || (normB === 'byd60m' && isBranch60M(user));
             });
 
             if (!isBranchAllowed) {
@@ -144,15 +147,16 @@ const checkDateEligibility = async ({
     const holiday = await Holiday.findOne({ date: targetDate, is_active: true });
     if (holiday) {
         const isStandby = Boolean(user && user.is_standby);
+        const isHolidayAllowed = isStandby || isBranch60M(user);
 
-        if (!isStandby && !isAdminOverride) {
+        if (!isHolidayAllowed && !isAdminOverride) {
             return {
                 eligible: false,
-                reason: 'holiday_standby_only',
+                reason: 'holiday_60m_standby_only',
                 isHoliday: true,
                 holidayName: holiday.name,
                 holiday,
-                message: `ថ្ងៃទី ${toOrderInputDate(targetDate)} គឺ ${holiday.name} (ថ្ងៃឈប់សម្រាកបុណ្យជាតិ)។ មានតែបុគ្គលិក Standby ប៉ុណ្ណោះដែលអាចបញ្ជាទិញបាន។`
+                message: `ថ្ងៃទី ${toOrderInputDate(targetDate)} គឺ ${holiday.name} (ថ្ងៃឈប់សម្រាកបុណ្យជាតិ)។ មានតែបុគ្គលិកសាខា 60M និង Standby ប៉ុណ្ណោះដែលអាចបញ្ជាទិញបាន។`
             };
         }
 
@@ -162,7 +166,7 @@ const checkDateEligibility = async ({
             holidayName: holiday.name,
             holiday,
             isWeekend,
-            message: `ថ្ងៃទី ${toOrderInputDate(targetDate)} គឺ ${holiday.name} (បុគ្គលិក Standby ត្រូវបានអនុញ្ញាត)`
+            message: `ថ្ងៃទី ${toOrderInputDate(targetDate)} គឺ ${holiday.name} (បុគ្គលិកសាខា 60M / Standby ត្រូវបានអនុញ្ញាត)`
         };
     }
 
@@ -176,6 +180,7 @@ const checkDateEligibility = async ({
 };
 
 module.exports = {
+    isBranch60M,
     checkDateEligibility,
     getDayOfWeek,
     getSettingValue,

@@ -634,7 +634,7 @@ const StaffPortal = () => {
 
                             {!isEligible && (
                               <span className="text-[9px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-0.5">
-                                <Lock size={9} /> {day.eligibility?.reason === 'sunday_60m_only' ? '60M only' : 'Standby only'}
+                                <Lock size={9} /> {day.eligibility?.reason === 'sunday_60m_only' ? '60M only' : '60M / Standby only'}
                               </span>
                             )}
                           </div>
@@ -693,9 +693,9 @@ const StaffPortal = () => {
                         {singleActiveDay.holiday.name} (Public Holiday)
                       </p>
                       <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                        {user?.is_standby
-                          ? 'You are on Standby duty and can order lunch on this holiday.'
-                          : 'Orders on public holidays are reserved strictly for Standby staff.'}
+                        {(user?.is_standby || /60m/i.test(String(user?.branch || '').replace(/\s+/g, '')))
+                          ? 'You are 60M / Standby staff and can order lunch on this holiday.'
+                          : 'Orders on public holidays are reserved for 60M and Standby staff.'}
                       </p>
                     </div>
                   </div>

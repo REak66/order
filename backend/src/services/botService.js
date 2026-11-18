@@ -636,8 +636,8 @@ const registerHandlers = (telegramBot) => {
                 });
 
                 if (!eligibility.eligible) {
-                    if (eligibility.reason === 'holiday_standby_only') {
-                        results.push(`• ${displayDate}: 🚫 ${eligibility.holidayName || 'ថ្ងៃឈប់សម្រាកបុណ្យជាតិ'} (សម្រាប់តែបុគ្គលិក Standby)`);
+                    if (eligibility.reason === 'holiday_60m_standby_only') {
+                        results.push(`• ${displayDate}: 🚫 ${eligibility.holidayName || 'ថ្ងៃឈប់សម្រាកបុណ្យជាតិ'} (សម្រាប់តែបុគ្គលិកសាខា 60M និង Standby)`);
                     } else if (eligibility.reason === 'sunday_60m_only') {
                         results.push(`• ${displayDate}: ❌ ថ្ងៃអាទិត្យសម្រាប់តែបុគ្គលិកសាខា ${eligibility.allowedBranches?.join(', ') || 'BYD 60M'} ប៉ុណ្ណោះ`);
                     } else if (eligibility.reason === 'past_date') {
